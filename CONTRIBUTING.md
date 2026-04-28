@@ -4,7 +4,7 @@ Thanks for taking the time to improve `@0001-labs/drag`.
 
 ## Development
 
-Use pnpm and Node.js 20 or newer.
+Use pnpm and Node.js 22.12.0 or newer.
 
 ```bash
 pnpm install
