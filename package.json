@@ -1,0 +1,86 @@
+{
+  "name": "@0001-labs/drag",
+  "version": "0.1.0",
+  "description": "A small framework-agnostic drag-and-drop engine with Web Component helpers.",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "packageManager": "pnpm@10.30.1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0001-labs/drag.git"
+  },
+  "bugs": {
+    "url": "https://github.com/0001-labs/drag/issues"
+  },
+  "homepage": "https://drag.0001.dev",
+  "keywords": [
+    "drag",
+    "drop",
+    "drag-and-drop",
+    "dnd",
+    "typescript",
+    "web-components",
+    "accessibility"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": [
+    "./dist/elements.*"
+  ],
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./element": {
+      "types": "./dist/element.d.ts",
+      "import": "./dist/element.js",
+      "require": "./dist/element.cjs"
+    },
+    "./elements": {
+      "types": "./dist/elements.d.ts",
+      "import": "./dist/elements.js",
+      "require": "./dist/elements.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "dev": "vite --host 127.0.0.1",
+    "docs:build": "astro build --root docs",
+    "docs:dev": "astro dev --root docs --host 127.0.0.1 --port 5197",
+    "docs:preview": "astro preview --root docs --host 127.0.0.1 --port 5198",
+    "deploy:docs": "pnpm docs:build && wrangler pages deploy docs-dist --project-name=0001-drag-docs",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:browser": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@astrojs/starlight": "^0.38.4",
+    "@eslint/js": "^9.0.0",
+    "@playwright/test": "^1.0.0",
+    "@types/node": "^20.0.0",
+    "astro": "^6.1.9",
+    "eslint": "^9.0.0",
+    "jsdom": "^24.0.0",
+    "sharp": "^0.34.5",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0",
+    "vite": "^6.0.0",
+    "vitest": "^2.0.0",
+    "wrangler": "^4.85.0"
+  }
+}

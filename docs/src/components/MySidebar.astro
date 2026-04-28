@@ -1,0 +1,181 @@
+---
+const { sidebar } = Astro.locals.starlightRoute;
+
+const groupTranslationKeys: Record<string, string> = {
+  'Start Here': 'start-here',
+  Examples: 'examples',
+  API: 'api',
+  Guides: 'guides',
+};
+---
+
+<nav id="sidebar-nav" class="sidebar-nav" aria-label="Documentation">
+  <button id="sidebar-close-btn" class="sidebar-close-btn" aria-label="Close navigation menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  </button>
+
+  <div class="sidebar-content">
+    {
+      sidebar.map((group, groupIndex) => {
+        const groupKey = groupTranslationKeys[group.label] ?? group.label.toLowerCase();
+        return (
+          <details open class="sidebar-group">
+            <summary class="sidebar-group-summary">
+              <span class="group-label" data-key={groupKey}>{group.label}</span>
+            </summary>
+            <ul class="sidebar-entries" data-first-two={groupIndex < 2}>
+              {group.entries.map((entry) => (
+                <li class={`sidebar-entry ${groupIndex < 2 ? 'first-two' : ''}`}>
+                  <a
+                    href={entry.href}
+                    class={`sidebar-link ${entry.isCurrent ? 'current' : ''}`}
+                    aria-current={entry.isCurrent ? 'page' : undefined}
+                  >
+                    {entry.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        );
+      })
+    }
+  </div>
+
+  <div class="sidebar-spacer"></div>
+
+  <div class="sidebar-footer">
+    <a class="github-link" href="https://github.com/0001-labs/drag" aria-label="GitHub repository">
+      <svg width="18" height="18" viewBox="0 0 98 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M49,8C25.3,8,6,27.3,6,51c0,19.1,12.4,35.3,29.6,41c2.2,0.4,3-1,3-2.2c0-1.1,0-4.5,0-8.2c-12,2.6-14.5-5.2-14.5-5.2c-2-5.2-4.8-6.6-4.8-6.6c-3.9-2.6,0.3-2.5,0.3-2.5c4.3,0.3,6.6,4.4,6.6,4.4c3.8,6.6,10,4.7,12.4,3.6c0.4-2.8,1.5-4.7,2.7-5.8c-9.6-1.1-19.6-4.8-19.6-21.3c0-4.7,1.7-8.5,4.3-11.6c-0.4-1.1-1.9-5.3,0.4-11c0,0,3.6-1.1,11.8,4.4c3.4-1,7.1-1.5,10.8-1.5s7.4,0.5,10.8,1.5c8.2-5.5,11.8-4.4,11.8-4.4c2.3,5.8,0.8,9.9,0.4,11c2.7,3.1,4.3,7,4.3,11.6c0,16.6-10.1,20.2-19.7,21.3c1.6,1.4,3,4.1,3,8.2c0,5.8,0,10.5,0,11.9c0,1.2,0.8,2.6,3,2.2C79.6,86.3,92,70.1,92,51C92,27.3,72.7,8,49,8z" fill="currentColor"></path>
+      </svg>
+    </a>
+    <span class="version-badge">0.1.0</span>
+  </div>
+</nav>
+
+<style>
+  .sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    height: 100%;
+    overflow-y: auto;
+    padding: 40px;
+    background: var(--drag-docs-sidebar-bg);
+  }
+
+  .sidebar-close-btn {
+    display: none;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--drag-docs-header-text);
+    cursor: pointer;
+  }
+
+  .sidebar-close-btn:hover {
+    background: var(--drag-docs-search-bg);
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .sidebar-group-summary {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 20px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+
+  .sidebar-group-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .group-label {
+    color: var(--drag-docs-header-text);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .sidebar-entries {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .sidebar-entries[data-first-two="true"] {
+    padding-left: 20px;
+  }
+
+  .sidebar-entry {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+  }
+
+  .sidebar-link {
+    color: var(--drag-docs-header-text-secondary);
+    font-size: 14px;
+    line-height: 20px;
+    text-decoration: none;
+  }
+
+  .sidebar-link.current,
+  .sidebar-link:hover,
+  .sidebar-link:focus-visible {
+    color: var(--drag-docs-accent);
+    outline: none;
+  }
+
+  .sidebar-spacer {
+    flex: 1;
+  }
+
+  .sidebar-footer {
+    display: flex;
+    align-items: center;
+    max-height: 24px;
+    gap: 12px;
+  }
+
+  .github-link,
+  .version-badge {
+    color: var(--drag-docs-header-text-secondary);
+  }
+
+  .version-badge {
+    font-size: 13px;
+  }
+
+  @media (max-width: 768px) {
+    .sidebar-nav {
+      position: relative;
+      padding: 60px 24px 24px;
+    }
+
+    .sidebar-close-btn {
+      display: flex;
+    }
+  }
+</style>
