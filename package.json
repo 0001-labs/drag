@@ -62,7 +62,7 @@
     "docs:dev": "astro dev --root docs --host 127.0.0.1 --port 5197",
     "docs:preview": "astro preview --root docs --host 127.0.0.1 --port 5198",
     "deploy:docs": "pnpm docs:build && wrangler pages deploy docs-dist --project-name=0001-drag-docs",
-    "lint": "eslint .",
+    "lint": "astro sync --root docs && eslint .",
     "test": "vitest run",
     "test:browser": "playwright test",
     "typecheck": "tsc --noEmit"
