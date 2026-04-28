@@ -1,0 +1,53 @@
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.buildpath
+.cursorrules
+
+# Node.js / Build tools
+node_modules/
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+.bun/
+
+# Build artifacts
+dist/
+docs-dist/
+build/
+coverage/
+playwright-report/
+test-results/
+.vite/
+docs/.astro/
+.astro/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+tmp/
+temp/
+.tmp/
+.codex-temp/
+
+# Local AI docs
+CLAUDE.md
+AGENTS.md

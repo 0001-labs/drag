@@ -1,0 +1,209 @@
+---
+import Search from '@astrojs/starlight/components/Search.astro';
+---
+
+<header class="site-header">
+  <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Toggle navigation menu">
+    <svg class="hamburger-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+    <svg class="close-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  </button>
+
+  <div class="header-logo">
+    <a href="/" class="logo-link">
+      <span class="logo-text">Drag</span>
+      <span class="logo-dot" aria-hidden="true"></span>
+    </a>
+  </div>
+
+  <div class="header-divider" aria-hidden="true"></div>
+
+  <div class="header-search">
+    <Search class="custom-search" />
+  </div>
+
+  <div class="header-actions">
+    <a class="header-link" href="/examples/live-demo/">Demo</a>
+    <a class="header-link" href="/api/element-adapter/">API</a>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: relative;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    height: 60px;
+    border-bottom: 1px solid var(--drag-docs-header-border);
+    background: var(--drag-docs-header-bg);
+  }
+
+  .mobile-menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-left: 8px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--drag-docs-header-text);
+    cursor: pointer;
+  }
+
+  .mobile-menu-btn:hover {
+    background: var(--drag-docs-search-bg);
+  }
+
+  .mobile-menu-btn .close-icon,
+  .mobile-menu-btn.active .hamburger-icon {
+    display: none;
+  }
+
+  .mobile-menu-btn.active .close-icon {
+    display: block;
+  }
+
+  .header-logo {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    width: 280.5px;
+    height: 60px;
+    padding: 0 40px;
+    border-right: 1px solid var(--drag-docs-header-border);
+  }
+
+  .logo-link {
+    display: flex;
+    align-items: baseline;
+    gap: 11px;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .logo-text {
+    color: var(--drag-docs-header-text);
+    font-family: var(--drag-docs-typeface);
+    font-size: 32px;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .logo-dot {
+    width: 16px;
+    height: 16px;
+    background: var(--drag-docs-accent);
+  }
+
+  .header-divider {
+    flex-shrink: 0;
+    width: 20px;
+    height: 60px;
+    border-right: 1px solid var(--drag-docs-header-border);
+  }
+
+  .header-search {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    padding: 0 20px 0 40px;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 18px;
+    padding-right: 40px;
+  }
+
+  .header-link {
+    color: var(--drag-docs-header-text-secondary);
+    font-size: 14px;
+    text-decoration: none;
+  }
+
+  .header-link:hover,
+  .header-link:focus-visible {
+    color: var(--drag-docs-header-text);
+  }
+
+  :global(.custom-search) {
+    width: 100%;
+    max-width: 320px;
+  }
+
+  :global(.custom-search button[data-open-modal]) {
+    width: 100%;
+    max-width: 320px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--drag-docs-search-bg);
+    color: var(--drag-docs-header-text-secondary);
+    font-family: var(--drag-docs-typeface);
+  }
+
+  :global(.custom-search button[data-open-modal] kbd) {
+    display: none;
+  }
+
+  @media (max-width: 1024px) {
+    .header-logo {
+      width: auto;
+      padding: 0 20px;
+    }
+
+    .header-divider {
+      width: 15px;
+    }
+
+    .header-search {
+      padding: 0 15px;
+    }
+
+    .header-actions {
+      padding-right: 20px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .mobile-menu-btn {
+      display: flex;
+    }
+
+    .header-logo {
+      border-right: 0;
+      padding: 0 16px;
+    }
+
+    .logo-text {
+      font-size: 28px;
+    }
+
+    .logo-dot {
+      width: 13px;
+      height: 13px;
+    }
+
+    .header-divider,
+    .header-actions {
+      display: none;
+    }
+
+    .header-search {
+      padding: 0 16px;
+    }
+  }
+</style>
