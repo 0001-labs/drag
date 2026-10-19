@@ -192,6 +192,8 @@ type ContainerSnapshot = {
   room: number;
   /** The lifted item's margin before it along this container's axis. */
   marginStart: number;
+  /** Screen pixels to the list's own, for a list inside a scaled parent. */
+  scale: number;
   isHome: boolean;
 };
 
@@ -213,6 +215,7 @@ type Session = {
   lastX: number;
   lastY: number;
   liftBox: Box;
+  previewScale: number;
   sourceIndex: number;
   home: ContainerSnapshot;
   containers: ContainerSnapshot[];
@@ -536,6 +539,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       vertical: parsePixels(sourceStyle.marginTop) + parsePixels(sourceStyle.marginBottom),
       horizontal: parsePixels(sourceStyle.marginLeft) + parsePixels(sourceStyle.marginRight),
     };
+    const itemScale = scaleOf(registration.element, liftBox);
     const scrollers = new Map<HTMLElement | null, Scroller>();
     const snapshots: ContainerSnapshot[] = [];
     let sourceIndex = 0;
@@ -546,7 +550,10 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       const isHome = candidate === homeRegistration;
       const style = view.getComputedStyle(candidate.element);
       const vertical = candidate.axis === 'vertical';
-      const gap = parsePixels(vertical ? style.rowGap : style.columnGap);
+      const box = measure(candidate.element);
+      // A list drawn inside a scaled parent: its own pixels against the screen's.
+      const scale = scaleOf(candidate.element, box);
+      const gap = parsePixels(vertical ? style.rowGap : style.columnGap) * scale;
       const slots: Slot[] = [];
       members.forEach((member, original) => {
         if (member === registration) {
@@ -568,14 +575,15 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       }
       snapshots.push({
         registration: candidate,
-        box: measure(candidate.element),
+        box,
+        scale,
         gap,
-        paddingStart: parsePixels(vertical ? style.paddingTop : style.paddingLeft),
+        paddingStart: parsePixels(vertical ? style.paddingTop : style.paddingLeft) * scale,
         scroller,
         slots,
         // The lifted item's margin box and the list's gap: the room siblings give.
-        room: (vertical ? liftBox.height + margins.vertical : liftBox.width + margins.horizontal) + gap,
-        marginStart: vertical ? margins.top : margins.left,
+        room: (vertical ? liftBox.height + margins.vertical * itemScale : liftBox.width + margins.horizontal * itemScale) + gap,
+        marginStart: (vertical ? margins.top : margins.left) * itemScale,
         isHome,
       });
     }
@@ -609,12 +617,14 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       position: 'absolute',
       left: `${liftBox.left}px`,
       top: `${liftBox.top}px`,
-      width: `${liftBox.width}px`,
-      height: `${liftBox.height}px`,
+      // Drawn at the item's own size and scaled as it was on the page.
+      width: `${registration.element.offsetWidth ? registration.element.offsetWidth : liftBox.width}px`,
+      height: `${registration.element.offsetHeight ? registration.element.offsetHeight : liftBox.height}px`,
+      transformOrigin: '0 0',
       margin: '0',
       boxSizing: 'border-box',
       translate: 'none',
-      transform: 'translate3d(0, 0, 0)',
+      transform: previewTransform(0, 0, itemScale),
       transition: 'none',
       willChange: 'transform',
       pointerEvents: 'none',
@@ -632,6 +642,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       lastX: startX,
       lastY: startY,
       liftBox,
+      previewScale: itemScale,
       sourceIndex,
       home,
       containers: snapshots,
@@ -664,7 +675,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (!current) return;
     current.lastX = clientX;
     current.lastY = clientY;
-    current.preview.style.transform = `translate3d(${clientX - current.startX}px, ${clientY - current.startY}px, 0)`;
+    current.preview.style.transform = previewTransform(clientX - current.startX, clientY - current.startY, current.previewScale);
     updateImpact(current);
     scheduleAutoScroll(current);
   }
@@ -786,7 +797,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const target = targetPosition(current);
     const { duration, easing } = settings.outOfTheWay;
     current.preview.style.transition = animate && !reducedMotion ? `transform ${duration}ms ${easing}` : 'none';
-    current.preview.style.transform = `translate3d(${target.x}px, ${target.y}px, 0)`;
+    current.preview.style.transform = previewTransform(target.x, target.y, current.previewScale);
   }
 
   /** Scrolls the list, then the page, so the moved item is in view. */
@@ -860,7 +871,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         let value = 0;
         if (snapshot.isHome && slot.original > current.sourceIndex) value -= snapshot.room;
         if (destination?.container === snapshot && position >= destination.index) value += snapshot.room;
-        shift(current, slot.item.element, value, snapshot.registration.axis);
+        shift(current, slot.item.element, value / snapshot.scale, snapshot.registration.axis);
       });
     }
 
@@ -986,7 +997,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       return;
     }
     current.preview.style.transition = `transform ${duration}ms ${easing}`;
-    current.preview.style.transform = `translate3d(${target.x}px, ${target.y}px, 0)`;
+    current.preview.style.transform = previewTransform(target.x, target.y, current.previewScale);
     let finished = false;
     const done = () => {
       if (finished) return;
@@ -1180,6 +1191,18 @@ function labelOf(element: HTMLElement, handle: HTMLElement): string {
   const named = element.getAttribute('aria-label') ?? handle.getAttribute('aria-label');
   const text = named ?? element.textContent?.replace(/\s+/g, ' ').trim() ?? '';
   return text.length > 60 ? `${text.slice(0, 59)}…` : text || 'Item';
+}
+
+/** How much larger than its own pixels an element is drawn on the screen. */
+function scaleOf(element: HTMLElement, box: Box): number {
+  if (element.offsetWidth <= 0 || box.width <= 0) return 1;
+  const scale = box.width / element.offsetWidth;
+  // offsetWidth is rounded to a whole pixel: a difference that small is not a scale.
+  return Math.abs(scale - 1) < 0.02 ? 1 : scale;
+}
+
+function previewTransform(x: number, y: number, scale: number): string {
+  return `translate3d(${x}px, ${y}px, 0)${scale === 1 ? '' : ` scale(${scale})`}`;
 }
 
 function measure(element: HTMLElement): Box {
