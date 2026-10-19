@@ -176,6 +176,40 @@ describe('createSortable', () => {
     expect(sortable.isDragging()).toBe(false);
   });
 
+  it('lets the product take an item dropped outside every list, where it lies', () => {
+    sortable.destroy();
+    const taken: Array<{ x: number; y: number }> = [];
+    sortable = createSortable({
+      onDragEnd: (result) => ended.push(result),
+      onDropOutside: (_start, point) => {
+        taken.push(point);
+        return true;
+      },
+    });
+    const a = column('a', 0, 2);
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 300, 50);
+    expect(document.documentElement.hasAttribute('data-drag-outside')).toBe(true);
+    pointer('pointerup', window, 300, 50);
+    expect(taken).toEqual([{ x: 300, y: 50 }]);
+    expect(ended[0]).toEqual(expect.objectContaining({ destination: null, reason: 'DROP' }));
+    expect(document.documentElement.hasAttribute('data-drag-outside')).toBe(false);
+  });
+
+  it('reads the pointer where the page says it is', () => {
+    sortable.destroy();
+    sortable = createSortable({
+      onDragUpdate: (update) => updates.push(update.destination),
+      pointerPoint: (event) => ({ x: event.clientX * 2, y: event.clientY * 2 }),
+    });
+    const a = column('a', 0, 4);
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 5, 5);
+    pointer('pointermove', window, 5, 16);
+    expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 1 });
+  });
+
   describe('with the keyboard', () => {
     const key = (target: EventTarget, name: string) =>
       target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }));

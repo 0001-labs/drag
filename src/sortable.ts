@@ -104,6 +104,17 @@ export type SortableOptions = {
   renderPreview?: (source: HTMLElement) => HTMLElement;
   /** Announcements and the keyboard instructions; English by default. */
   messages?: Partial<SortableMessages>;
+  /**
+   * The pointer's place in the viewport, for a page that rewrites the
+   * event's own coordinates; `clientX` and `clientY` by default.
+   */
+  pointerPoint?: (event: PointerEvent) => { x: number; y: number };
+  /**
+   * A pointer drop outside every list. Return true when the product has taken
+   * the item (onto a canvas, say): it lands there at once instead of flying
+   * home. `onDragEnd` still follows, with no destination.
+   */
+  onDropOutside?: (start: SortableStart, point: { x: number; y: number }) => boolean;
 };
 
 export type SortableController = {
@@ -228,6 +239,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     autoScrollEdge: options.autoScrollEdge ?? defaults.autoScrollEdge,
   };
   const messages: SortableMessages = { ...defaultMessages, ...options.messages };
+  const pointOf = options.pointerPoint ?? ((event: PointerEvent) => ({ x: event.clientX, y: event.clientY }));
   const containers = new Map<HTMLElement, ContainerRegistration>();
   const items = new Map<HTMLElement, ItemRegistration>();
   const handles = new Map<HTMLElement, ItemRegistration>();
@@ -291,8 +303,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   function installDocument(document: Document): void {
     if (listening) return;
     listening = true;
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onHandleKeyDown);
+    // Listened for first, so a page that stops these events cannot keep them from the engine.
+    window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('keydown', onHandleKeyDown, true);
     if (!document.querySelector(`style[${handleStyleId}]`)) {
       const style = document.createElement('style');
       style.setAttribute(handleStyleId, '');
@@ -333,6 +346,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const registration = event.target instanceof HTMLElement ? handles.get(event.target) : undefined;
     if (!registration || !registration.canDrag()) return;
     event.preventDefault();
+    event.stopPropagation();
     addWindowListeners();
     const box = measure(registration.element);
     lift(registration, -1, box.left + box.width / 2, box.top + box.height / 2, 'SNAP');
@@ -362,8 +376,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       item: registration,
       pointerId: event.pointerId,
       pointerType: event.pointerType,
-      startX: event.clientX,
-      startY: event.clientY,
+      startX: pointOf(event).x,
+      startY: pointOf(event).y,
       timer: null,
     };
     if (event.pointerType === 'touch') {
@@ -376,7 +390,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
 
   function onPointerMove(event: PointerEvent): void {
     if (pending && event.pointerId === pending.pointerId) {
-      const distance = Math.hypot(event.clientX - pending.startX, event.clientY - pending.startY);
+      const point = pointOf(event);
+      const distance = Math.hypot(point.x - pending.startX, point.y - pending.startY);
       if (distance < settings.dragDistance) return;
       if (pending.pointerType === 'touch') {
         // The finger moved before the hold finished: it scrolls.
@@ -386,7 +401,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       lift(pending.item, pending.pointerId, pending.startX, pending.startY);
     }
     if (session && event.pointerId === session.pointerId && !session.dropping) {
-      move(event.clientX, event.clientY);
+      const point = pointOf(event);
+      move(point.x, point.y);
     }
   }
 
@@ -411,20 +427,21 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (!current || current.dropping) return;
     if (event.key === 'Escape') {
       event.preventDefault();
+      event.stopPropagation();
       drop('CANCEL');
       return;
     }
     if (current.mode !== 'SNAP') return;
-    // While lifted by the keyboard, these keys belong to the drag.
+    // While lifted by the keyboard, these keys belong to the drag, not the page.
     if (event.key === ' ' || event.key === 'Enter') {
-      event.preventDefault();
       drop('DROP');
-    } else if (event.key === 'Tab') {
-      event.preventDefault();
     } else if (event.key in arrows) {
-      event.preventDefault();
       moveByKey(current, arrows[event.key as keyof typeof arrows]);
+    } else if (event.key !== 'Tab') {
+      return;
     }
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   function onTouchMove(event: TouchEvent): void {
@@ -698,6 +715,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (previous?.container === next?.container && previous?.index === next?.index) return;
     current.destination = next;
     applyShifts(current, previous?.container ?? null);
+    current.overlay.ownerDocument.documentElement.toggleAttribute('data-drag-outside', !next);
     options.onDragUpdate?.(updateOf(current));
     announceMove(current);
   }
@@ -937,6 +955,13 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (current.impactFrame !== null) cancelAnimationFrame(current.impactFrame);
 
     // A cancel, or a drop outside every list, sends the item home.
+    // A product may take an item dropped outside every list, where it lies.
+    if (reason === 'DROP' && !current.destination && current.mode === 'FLUID') {
+      if (options.onDropOutside?.(startOf(current), { x: current.lastX, y: current.lastY })) {
+        finish(current, { ...startOf(current), destination: null, reason: 'DROP' });
+        return;
+      }
+    }
     const returning = reason === 'CANCEL' || !current.destination;
     if (returning) {
       const previous = current.destination?.container ?? null;
@@ -1049,6 +1074,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     for (const snapshot of current.containers) snapshot.registration.element.removeAttribute('data-drag-over');
     current.overlay.remove();
     element.ownerDocument.documentElement.removeAttribute('data-drag-active');
+    element.ownerDocument.documentElement.removeAttribute('data-drag-outside');
     session = null;
     removeWindowListeners();
   }
@@ -1106,8 +1132,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       destroyed = true;
       clearPending();
       if (session) cleanup(session);
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onHandleKeyDown);
+      window.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('keydown', onHandleKeyDown, true);
       instructions?.remove();
       liveRegion?.remove();
       listening = false;
