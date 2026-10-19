@@ -5,6 +5,7 @@ export default defineConfig({
     index: 'src/index.ts',
     element: 'src/element.ts',
     elements: 'src/elements.ts',
+    sortable: 'src/sortable.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

@@ -1,0 +1,178 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createSortable, type SortableController, type SortableResult } from '../src/sortable';
+
+const pitch = 20;
+const cellHeight = 19;
+const cellWidth = 79;
+
+type Layout = { list: HTMLElement; cells: HTMLElement[] };
+
+function pointer(type: string, target: EventTarget, x: number, y: number, pointerType = 'mouse'): void {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperties(event, {
+    pointerId: { value: 1 },
+    pointerType: { value: pointerType },
+    button: { value: 0 },
+    clientX: { value: x },
+    clientY: { value: y },
+  });
+  target.dispatchEvent(event);
+}
+
+function stubBox(element: HTMLElement, left: number, top: number, width: number, height: number): void {
+  element.getBoundingClientRect = () => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) });
+}
+
+/** A column of cells 19px high a pixel apart, as an Ezo list draws them. */
+function column(id: string, left: number, count: number): Layout {
+  const list = document.createElement('div');
+  list.dataset.id = id;
+  stubBox(list, left, 0, cellWidth, 400);
+  const cells = Array.from({ length: count }, (_, index) => {
+    const cell = document.createElement('div');
+    cell.textContent = `${id}${index}`;
+    cell.style.marginBottom = '1px';
+    stubBox(cell, left, index * pitch, cellWidth, cellHeight);
+    list.append(cell);
+    return cell;
+  });
+  document.body.append(list);
+  return { list, cells };
+}
+
+function register(sortable: SortableController, layout: Layout, id: string): void {
+  sortable.container({ element: layout.list, id, type: 'cell' });
+  layout.cells.forEach((cell, index) => sortable.item({ element: cell, id: `${id}${index}`, type: 'cell' }));
+}
+
+describe('createSortable', () => {
+  let sortable: SortableController;
+  let ended: SortableResult[];
+  let updates: Array<{ droppableId: string; index: number } | null>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    ended = [];
+    updates = [];
+    sortable = createSortable({
+      onDragUpdate: (update) => updates.push(update.destination),
+      onDragEnd: (result) => ended.push(result),
+    });
+  });
+
+  afterEach(() => {
+    sortable.destroy();
+    document.body.replaceChildren();
+    vi.useRealTimers();
+  });
+
+  it('waits for the mouse to move five pixels before it lifts', () => {
+    const a = column('a', 0, 3);
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 13);
+    expect(sortable.isDragging()).toBe(false);
+    pointer('pointermove', window, 10, 16);
+    expect(sortable.isDragging()).toBe(true);
+    expect(document.querySelector('[data-drag-preview]')).not.toBeNull();
+    expect(a.cells[0].style.visibility).toBe('hidden');
+  });
+
+  it('moves a sibling once the lifted edge passes its centre, by the lifted size', () => {
+    const a = column('a', 0, 4);
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    // The bottom edge (19 + moved) passes the next centre (29.5) once moved past 10.5.
+    pointer('pointermove', window, 10, 20);
+    expect(updates).toEqual([]);
+    pointer('pointermove', window, 10, 21);
+    expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 1 });
+    // The sibling closes up by the cell and its pixel.
+    expect(a.cells[1].style.translate).toBe('0 -20px');
+  });
+
+  it('does not flicker back when the lifted item stops just past a centre', () => {
+    const a = column('a', 0, 4);
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 22);
+    pointer('pointermove', window, 10, 21);
+    pointer('pointermove', window, 10, 20);
+    expect(updates).toEqual([{ droppableId: 'a', index: 1 }]);
+    // Back once the top edge passes the moved sibling's centre (9.5).
+    pointer('pointermove', window, 10, 19);
+    expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 0 });
+  });
+
+  it('drops into another list and makes room there', () => {
+    const a = column('a', 0, 3);
+    const b = column('b', 100, 3);
+    register(sortable, a, 'a');
+    register(sortable, b, 'b');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 110, 10);
+    expect(updates.at(-1)).toEqual({ droppableId: 'b', index: 0 });
+    expect(b.cells[0].style.translate).toBe('0 20px');
+    expect(a.cells[1].style.translate).toBe('0 -20px');
+    pointer('pointerup', window, 110, 10);
+    vi.runAllTimers();
+    expect(ended).toEqual([
+      expect.objectContaining({
+        draggableId: 'a0',
+        source: { droppableId: 'a', index: 0 },
+        destination: { droppableId: 'b', index: 0 },
+        reason: 'DROP',
+      }),
+    ]);
+    expect(document.querySelector('[data-drag-preview]')).toBeNull();
+    expect(b.cells[0].style.translate).toBe('');
+    expect(a.cells[0].style.visibility).toBe('');
+  });
+
+  it('reports no destination for a drop outside every list', () => {
+    const a = column('a', 0, 3);
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 300, 10);
+    pointer('pointerup', window, 300, 10);
+    vi.runAllTimers();
+    expect(ended[0]).toEqual(expect.objectContaining({ destination: null, reason: 'DROP' }));
+  });
+
+  it('cancels with Escape and sends the item home', () => {
+    const a = column('a', 0, 3);
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 40);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(a.cells[1].style.translate).toBe('none');
+    vi.runAllTimers();
+    expect(ended[0]).toEqual(expect.objectContaining({ destination: null, reason: 'CANCEL' }));
+  });
+
+  it('lifts on touch only after the hold, and lets a moving finger scroll', () => {
+    const a = column('a', 0, 3);
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10, 'touch');
+    pointer('pointermove', window, 10, 30, 'touch');
+    vi.advanceTimersByTime(300);
+    expect(sortable.isDragging()).toBe(false);
+
+    pointer('pointerup', window, 10, 30, 'touch');
+    pointer('pointerdown', a.cells[0], 10, 10, 'touch');
+    vi.advanceTimersByTime(249);
+    expect(sortable.isDragging()).toBe(false);
+    vi.advanceTimersByTime(1);
+    expect(sortable.isDragging()).toBe(true);
+  });
+
+  it('does not lift from a button inside the item unless it allows it', () => {
+    const a = column('a', 0, 2);
+    const button = document.createElement('button');
+    a.cells[0].append(button);
+    register(sortable, a, 'a');
+    pointer('pointerdown', button, 10, 10);
+    pointer('pointermove', window, 10, 30);
+    expect(sortable.isDragging()).toBe(false);
+  });
+});

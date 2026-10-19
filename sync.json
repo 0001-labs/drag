@@ -1,0 +1,11 @@
+{
+  "sources": {
+    "Design system 1": {
+      "root": {
+        "to": "playground/ds1",
+        "nativeControls": true,
+        "modules": ["theme-bootstrap"]
+      }
+    }
+  }
+}

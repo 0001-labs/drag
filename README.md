@@ -65,12 +65,25 @@ import '@0001-labs/drag/elements';
 - Separate local drag data and native `DataTransfer` string data.
 - Minimal accessible Web Components for list reordering.
 
-## Docs
+## Sortable lists
 
-The docs site is built with Astro/Starlight and deployed to Cloudflare Pages.
+`@0001-labs/drag/sortable` lifts an item by a pointer, a finger hold or a pen and moves it through lists of the same type. Siblings move out of the way by the lifted item's whole size, as @hello-pangea/dnd does (see `NOTICE`), while the lifted item moves in an overlay by its transform alone.
 
-- Production target: https://drag.0001.dev
-- Current Pages URL: https://0001-drag-docs.pages.dev
+```ts
+import { createSortable } from '@0001-labs/drag/sortable';
+
+const sortable = createSortable({
+  onDragEnd: ({ source, destination }) => {
+    // Apply the new order synchronously; the engine takes its offsets away next.
+  },
+});
+sortable.container({ element: list, id: 'today', type: 'task' });
+sortable.item({ element: row, id: 'task-1', type: 'task' });
+```
+
+## Site
+
+https://drag.0001.dev holds the docs (Astro/Starlight) and the playground at `/playground/`: an Ezo board on Drag and on @hello-pangea/dnd, switched in place, each drag measured. A Cloudflare Worker serves both from `docs-dist` (`pnpm run deploy`).
 
 ## Development
 
@@ -81,6 +94,7 @@ pnpm typecheck
 pnpm lint
 pnpm build
 pnpm docs:build
+pnpm playground:dev
 pnpm test:browser
 ```
 

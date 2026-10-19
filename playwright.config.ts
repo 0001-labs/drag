@@ -14,6 +14,12 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
+      command: 'pnpm playground:dev',
+      url: 'http://127.0.0.1:5188/playground/',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
       command: 'pnpm docs:build && pnpm docs:preview',
       url: 'http://127.0.0.1:5198/',
       reuseExistingServer: !process.env.CI,
@@ -27,6 +33,14 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         baseURL: 'http://127.0.0.1:5187',
+      },
+    },
+    {
+      name: 'playground-chromium',
+      testMatch: /playground\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://127.0.0.1:5188',
       },
     },
     {

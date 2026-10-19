@@ -1,0 +1,12 @@
+{
+  "name": "drag",
+  "account_id": "ce6189d5ac975158991e207a3c4e1cd5",
+  "compatibility_date": "2026-10-19",
+  // The docs and the playground (/playground/), built into docs-dist by `pnpm site:build`.
+  "assets": {
+    "directory": "./docs-dist",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  },
+  "routes": [{ "pattern": "drag.0001.dev", "custom_domain": true }]
+}

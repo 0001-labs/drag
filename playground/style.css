@@ -1,0 +1,149 @@
+/*
+ * The playground on Design system 1's measures: a square is 20px, a cell is
+ * four squares wide and as many high as it has lines, drawn a pixel short,
+ * edge to edge as an Ezo list is. Words stand on the lower sixteen of a square.
+ */
+:root {
+  --sf: 1;
+  --square: 20px;
+  --cell-fill: light-dark(var(--slate-light), var(--slate-dark));
+  --rule: light-dark(var(--slate-light), var(--slate-dark));
+}
+
+body {
+  background: var(--background);
+  color: var(--text-color);
+  font-family: var(--typeface-regular);
+  font-size: var(--type-size-default);
+}
+
+.page {
+  padding: var(--square);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0 var(--square);
+  min-height: var(--square);
+  line-height: 16px;
+}
+
+.bar__title {
+  margin: 0;
+  font-family: var(--typeface-medium);
+  font-size: var(--type-size-default);
+  font-weight: inherit;
+  line-height: 16px;
+}
+
+.bar__docs {
+  margin-left: auto;
+}
+
+.readout {
+  margin: var(--square) 0 0;
+  min-height: var(--square);
+  padding-top: 4px;
+  box-sizing: border-box;
+  line-height: 16px;
+  color: var(--ds-text-color-muted);
+}
+
+.figure {
+  color: var(--text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.play-board-scroller {
+  margin: calc(2 * var(--square)) calc(-1 * var(--square)) 0;
+  padding: 0 var(--square) var(--square);
+  overflow-x: auto;
+}
+
+.play-board {
+  display: flex;
+  gap: calc(2 * var(--square));
+  width: max-content;
+}
+
+.play-list__title {
+  margin: 0;
+  height: var(--square);
+  padding-top: 4px;
+  box-sizing: border-box;
+  font-family: var(--typeface-medium);
+  font-size: var(--type-size-default);
+  font-weight: inherit;
+  line-height: 16px;
+}
+
+.play-list__columns {
+  display: flex;
+  align-items: stretch;
+  margin-top: var(--square);
+}
+
+/* Margins, not gaps, keep the pixel between cells: Pangea measures margins only. */
+.play-column {
+  display: flex;
+  flex-direction: column;
+  width: 79px;
+  margin-right: 1px;
+  background: var(--background);
+}
+
+.play-column__name {
+  height: var(--square);
+  padding: 3px 4px 0;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ds-text-color-muted);
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play-column__cells {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(5 * var(--square) + var(--drag-reserve, 0px));
+}
+
+.play-cell {
+  flex: none;
+  width: 79px;
+  height: calc(var(--rows, 1) * var(--square) - 1px);
+  margin-bottom: 1px;
+  padding: 3px 4px 0;
+  box-sizing: border-box;
+  background: var(--cell-fill);
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A paragraph wraps on lines of a square, each line's words on its sixteen. */
+.play-cell--text {
+  padding-top: 1px;
+  line-height: var(--square);
+  white-space: normal;
+}
+
+.play-cell--header {
+  background: transparent;
+  font-family: var(--typeface-medium);
+}
+
+/* The lifted cell or column, in either engine. */
+.play-cell[data-lifted],
+.play-cell[data-drag-preview],
+.play-column[data-lifted],
+.play-column[data-drag-preview] {
+  outline: 1px solid var(--text-color);
+  outline-offset: -1px;
+}

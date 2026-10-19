@@ -1,0 +1,945 @@
+/**
+ * Pointer-driven sortable lists: lift an item by a pointer, a finger hold or a
+ * pen, move it through lists of the same type, and drop it in a slot.
+ *
+ * The motion follows @hello-pangea/dnd (Apache-2.0, © 2019 Atlassian,
+ * © 2021 Gabriel Santerre; see NOTICE): siblings move out of the way by the
+ * lifted item's whole size, a sibling moves once the lifted item's edge passes
+ * its centre, counting the room it has already given, and the timings and
+ * curves are Pangea's. The engine around it is new and has no framework: the
+ * lifted item is a clone in an overlay moved by writing its transform in the
+ * pointer handler, siblings move by the `translate` property alone, geometry is
+ * measured once at lift, and nothing changes layout while the pointer moves.
+ */
+import type { Cleanup } from './types';
+import { once } from './util';
+
+export type SortableAxis = 'vertical' | 'horizontal';
+
+export type SortableLocation = {
+  droppableId: string;
+  index: number;
+};
+
+export type SortableStart = {
+  draggableId: string;
+  type: string;
+  source: SortableLocation;
+  mode: 'FLUID';
+};
+
+export type SortableUpdate = SortableStart & {
+  destination: SortableLocation | null;
+};
+
+export type SortableResult = SortableUpdate & {
+  reason: 'DROP' | 'CANCEL';
+};
+
+export type SortableContainerArgs = {
+  element: HTMLElement;
+  id: string;
+  type?: string;
+  axis?: SortableAxis;
+  isDropDisabled?: () => boolean;
+};
+
+export type SortableItemArgs = {
+  element: HTMLElement;
+  id: string;
+  type?: string;
+  /** Where the item is held; the item itself when left out. */
+  handle?: HTMLElement | null;
+  canDrag?: () => boolean;
+  /** Let a press on a button, field or link inside the handle start a drag. */
+  allowInteractive?: boolean;
+};
+
+export type SortableOptions = {
+  /** Called once the item lifts. */
+  onDragStart?: (start: SortableStart) => void;
+  /** Called when the destination changes. */
+  onDragUpdate?: (update: SortableUpdate) => void;
+  /**
+   * Called when the drop settles. Apply the new order synchronously
+   * (`flushSync` in React): the engine takes its offsets away right after.
+   */
+  onDragEnd?: (result: SortableResult) => void;
+  /** How long a finger holds before the item lifts, in milliseconds. */
+  touchHold?: number;
+  /** How far a mouse or pen moves before the item lifts, in pixels. */
+  dragDistance?: number;
+  /** Siblings moving out of the way. */
+  outOfTheWay?: { duration: number; easing: string };
+  /** The lifted item settling into its slot, its duration by distance. */
+  drop?: { minDuration: number; maxDuration: number; easing: string };
+  /** How near an edge, in pixels, the pointer scrolls the list or the page. */
+  autoScrollEdge?: number;
+  /** Custom properties copied from the source item onto the overlay. */
+  inheritProperties?: string[];
+  /** The element drawn under the pointer; a clone of the item by default. */
+  renderPreview?: (source: HTMLElement) => HTMLElement;
+};
+
+export type SortableController = {
+  container: (args: SortableContainerArgs) => Cleanup;
+  item: (args: SortableItemArgs) => Cleanup;
+  isDragging: () => boolean;
+  cancel: () => void;
+  destroy: () => void;
+};
+
+const defaults = {
+  touchHold: 250,
+  dragDistance: 5,
+  outOfTheWay: { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+  drop: { minDuration: 330, maxDuration: 550, easing: 'cubic-bezier(.2, 1, .1, 1)' },
+  autoScrollEdge: 60,
+} as const;
+
+/** Pangea's drop: the longest duration is reached at this distance. */
+const maxDropDistance = 1500;
+const maxScrollSpeed = 24;
+const inheritedText = ['color', 'font', 'letter-spacing', 'line-height', '-webkit-font-smoothing'];
+const interactive = 'input, textarea, select, option, button, a[href], [contenteditable]:not([contenteditable="false"])';
+const handleStyleId = 'data-0001-drag-sortable-style';
+const handleStyles = `
+[data-drag-handle]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;cursor:grab;touch-action:manipulation}
+:root[data-drag-active],:root[data-drag-active] *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important}
+`;
+
+type ContainerRegistration = Required<Omit<SortableContainerArgs, 'isDropDisabled'>> & {
+  isDropDisabled: () => boolean;
+};
+
+type ItemRegistration = Required<Omit<SortableItemArgs, 'handle' | 'canDrag'>> & {
+  handle: HTMLElement;
+  canDrag: () => boolean;
+};
+
+type Box = { left: number; top: number; width: number; height: number };
+
+type Scroller = {
+  element: HTMLElement | null;
+  liftLeft: number;
+  liftTop: number;
+  box: Box;
+};
+
+type Slot = {
+  item: ItemRegistration;
+  /** Index in the container before the lift, the source included. */
+  original: number;
+  box: Box;
+};
+
+type ContainerSnapshot = {
+  registration: ContainerRegistration;
+  box: Box;
+  gap: number;
+  paddingStart: number;
+  scroller: Scroller | null;
+  /** The items other than the source, in order. */
+  slots: Slot[];
+  /** The room the lifted item takes in this container, its margins and gap included. */
+  room: number;
+  /** The lifted item's margin before it along this container's axis. */
+  marginStart: number;
+  isHome: boolean;
+};
+
+type Pending = {
+  item: ItemRegistration;
+  pointerId: number;
+  pointerType: string;
+  startX: number;
+  startY: number;
+  timer: ReturnType<typeof setTimeout> | null;
+};
+
+type Session = {
+  item: ItemRegistration;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  lastX: number;
+  lastY: number;
+  liftBox: Box;
+  sourceIndex: number;
+  home: ContainerSnapshot;
+  containers: ContainerSnapshot[];
+  scrollers: Scroller[];
+  windowLiftX: number;
+  windowLiftY: number;
+  overlay: HTMLElement;
+  preview: HTMLElement;
+  destination: { container: ContainerSnapshot; index: number } | null;
+  shifts: Map<HTMLElement, { value: number; translate: string; transition: string }>;
+  sourceVisibility: string;
+  reserved: ContainerSnapshot | null;
+  scrollFrame: number | null;
+  impactFrame: number | null;
+  dropping: boolean;
+};
+
+export function createSortable(options: SortableOptions = {}): SortableController {
+  const settings = {
+    touchHold: options.touchHold ?? defaults.touchHold,
+    dragDistance: options.dragDistance ?? defaults.dragDistance,
+    outOfTheWay: options.outOfTheWay ?? defaults.outOfTheWay,
+    drop: options.drop ?? defaults.drop,
+    autoScrollEdge: options.autoScrollEdge ?? defaults.autoScrollEdge,
+  };
+  const containers = new Map<HTMLElement, ContainerRegistration>();
+  const items = new Map<HTMLElement, ItemRegistration>();
+  const handles = new Map<HTMLElement, ItemRegistration>();
+  let pending: Pending | null = null;
+  let session: Session | null = null;
+  let listening = false;
+  let destroyed = false;
+  let reducedMotion = false;
+
+  function container(args: SortableContainerArgs): Cleanup {
+    const registration: ContainerRegistration = {
+      element: args.element,
+      id: args.id,
+      type: args.type ?? 'default',
+      axis: args.axis ?? 'vertical',
+      isDropDisabled: args.isDropDisabled ?? (() => false),
+    };
+    containers.set(args.element, registration);
+    return once(() => {
+      if (containers.get(args.element) === registration) containers.delete(args.element);
+    });
+  }
+
+  function item(args: SortableItemArgs): Cleanup {
+    const handle = args.handle ?? args.element;
+    const registration: ItemRegistration = {
+      element: args.element,
+      id: args.id,
+      type: args.type ?? 'default',
+      handle,
+      canDrag: args.canDrag ?? (() => true),
+      allowInteractive: args.allowInteractive ?? false,
+    };
+    items.set(args.element, registration);
+    handles.set(handle, registration);
+    handle.setAttribute('data-drag-handle', '');
+    installDocument(handle.ownerDocument);
+    return once(() => {
+      if (items.get(args.element) === registration) items.delete(args.element);
+      if (handles.get(handle) === registration) {
+        handles.delete(handle);
+        handle.removeAttribute('data-drag-handle');
+      }
+    });
+  }
+
+  function installDocument(document: Document): void {
+    if (listening) return;
+    listening = true;
+    document.addEventListener('pointerdown', onPointerDown);
+    if (!document.querySelector(`style[${handleStyleId}]`)) {
+      const style = document.createElement('style');
+      style.setAttribute(handleStyleId, '');
+      style.textContent = handleStyles;
+      document.head.append(style);
+    }
+  }
+
+  function findHandle(target: EventTarget | null): ItemRegistration | null {
+    let element = target instanceof Element ? target : null;
+    let crossedInteractive = false;
+    while (element) {
+      const registration = element instanceof HTMLElement ? handles.get(element) : undefined;
+      if (registration) {
+        return crossedInteractive && !registration.allowInteractive ? null : registration;
+      }
+      if (element.matches(interactive)) crossedInteractive = true;
+      element = element.parentElement;
+    }
+    return null;
+  }
+
+  function onPointerDown(event: PointerEvent): void {
+    if (destroyed || session || pending) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const registration = findHandle(event.target);
+    if (!registration || !registration.canDrag()) return;
+
+    pending = {
+      item: registration,
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+      startX: event.clientX,
+      startY: event.clientY,
+      timer: null,
+    };
+    if (event.pointerType === 'touch') {
+      pending.timer = setTimeout(() => {
+        if (pending) lift(pending.item, pending.pointerId, pending.startX, pending.startY);
+      }, settings.touchHold);
+    }
+    addWindowListeners();
+  }
+
+  function onPointerMove(event: PointerEvent): void {
+    if (pending && event.pointerId === pending.pointerId) {
+      const distance = Math.hypot(event.clientX - pending.startX, event.clientY - pending.startY);
+      if (distance < settings.dragDistance) return;
+      if (pending.pointerType === 'touch') {
+        // The finger moved before the hold finished: it scrolls.
+        clearPending();
+        return;
+      }
+      lift(pending.item, pending.pointerId, pending.startX, pending.startY);
+    }
+    if (session && event.pointerId === session.pointerId && !session.dropping) {
+      move(event.clientX, event.clientY);
+    }
+  }
+
+  function onPointerUp(event: PointerEvent): void {
+    if (pending && event.pointerId === pending.pointerId) {
+      clearPending();
+      return;
+    }
+    if (session && event.pointerId === session.pointerId && !session.dropping) {
+      suppressClick();
+      drop('DROP');
+    }
+  }
+
+  function onPointerCancel(event: PointerEvent): void {
+    if (pending && event.pointerId === pending.pointerId) clearPending();
+    if (session && event.pointerId === session.pointerId && !session.dropping) drop('CANCEL');
+  }
+
+  function onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && session && !session.dropping) {
+      event.preventDefault();
+      drop('CANCEL');
+    }
+  }
+
+  function onTouchMove(event: TouchEvent): void {
+    // While lifted, the finger moves the item rather than the page.
+    if (session && event.cancelable) event.preventDefault();
+  }
+
+  function onContextMenu(event: Event): void {
+    if (pending || session) event.preventDefault();
+  }
+
+  function onBlur(): void {
+    clearPending();
+    if (session && !session.dropping) drop('CANCEL');
+  }
+
+  function onScroll(): void {
+    if (!session || session.dropping || session.impactFrame !== null) return;
+    const view = session.overlay.ownerDocument.defaultView;
+    if (!view) return;
+    session.impactFrame = view.requestAnimationFrame(() => {
+      if (!session) return;
+      session.impactFrame = null;
+      updateImpact(session);
+    });
+  }
+
+  function addWindowListeners(): void {
+    window.addEventListener('pointermove', onPointerMove, true);
+    window.addEventListener('pointerup', onPointerUp, true);
+    window.addEventListener('pointercancel', onPointerCancel, true);
+    window.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
+    window.addEventListener('contextmenu', onContextMenu, true);
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('scroll', onScroll, true);
+  }
+
+  function removeWindowListeners(): void {
+    window.removeEventListener('pointermove', onPointerMove, true);
+    window.removeEventListener('pointerup', onPointerUp, true);
+    window.removeEventListener('pointercancel', onPointerCancel, true);
+    window.removeEventListener('touchmove', onTouchMove, true);
+    window.removeEventListener('contextmenu', onContextMenu, true);
+    window.removeEventListener('keydown', onKeyDown, true);
+    window.removeEventListener('blur', onBlur);
+    window.removeEventListener('scroll', onScroll, true);
+  }
+
+  function clearPending(): void {
+    if (!pending) return;
+    if (pending.timer) clearTimeout(pending.timer);
+    pending = null;
+    if (!session) removeWindowListeners();
+  }
+
+  function suppressClick(): void {
+    const stop = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    window.addEventListener('click', stop, { capture: true, once: true });
+    setTimeout(() => window.removeEventListener('click', stop, true), 0);
+  }
+
+  function lift(registration: ItemRegistration, pointerId: number, startX: number, startY: number): void {
+    if (pending?.timer) clearTimeout(pending.timer);
+    pending = null;
+
+    const document = registration.element.ownerDocument;
+    const view = document.defaultView ?? window;
+    const homeRegistration = closestContainer(registration);
+    if (!homeRegistration) {
+      removeWindowListeners();
+      return;
+    }
+
+    // Asked for less motion: siblings and the drop move at once.
+    reducedMotion = view.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const liftBox = measure(registration.element);
+    const sourceStyle = view.getComputedStyle(registration.element);
+    const margins = {
+      top: parsePixels(sourceStyle.marginTop),
+      left: parsePixels(sourceStyle.marginLeft),
+      vertical: parsePixels(sourceStyle.marginTop) + parsePixels(sourceStyle.marginBottom),
+      horizontal: parsePixels(sourceStyle.marginLeft) + parsePixels(sourceStyle.marginRight),
+    };
+    const scrollers = new Map<HTMLElement | null, Scroller>();
+    const snapshots: ContainerSnapshot[] = [];
+    let sourceIndex = 0;
+
+    for (const candidate of containers.values()) {
+      if (candidate.type !== registration.type || !candidate.element.isConnected) continue;
+      const members = itemsOf(candidate);
+      const isHome = candidate === homeRegistration;
+      const style = view.getComputedStyle(candidate.element);
+      const vertical = candidate.axis === 'vertical';
+      const gap = parsePixels(vertical ? style.rowGap : style.columnGap);
+      const slots: Slot[] = [];
+      members.forEach((member, original) => {
+        if (member === registration) {
+          sourceIndex = original;
+          return;
+        }
+        slots.push({ item: member, original, box: measure(member.element) });
+      });
+      const scrollElement = scrollParent(candidate.element);
+      let scroller = scrollers.get(scrollElement) ?? null;
+      if (!scroller && scrollElement) {
+        scroller = {
+          element: scrollElement,
+          liftLeft: scrollElement.scrollLeft,
+          liftTop: scrollElement.scrollTop,
+          box: measure(scrollElement),
+        };
+        scrollers.set(scrollElement, scroller);
+      }
+      snapshots.push({
+        registration: candidate,
+        box: measure(candidate.element),
+        gap,
+        paddingStart: parsePixels(vertical ? style.paddingTop : style.paddingLeft),
+        scroller,
+        slots,
+        // The lifted item's margin box and the list's gap: the room siblings give.
+        room: (vertical ? liftBox.height + margins.vertical : liftBox.width + margins.horizontal) + gap,
+        marginStart: vertical ? margins.top : margins.left,
+        isHome,
+      });
+    }
+
+    const home = snapshots.find((snapshot) => snapshot.isHome);
+    if (!home) {
+      removeWindowListeners();
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.setAttribute('data-drag-overlay', '');
+    Object.assign(overlay.style, {
+      position: 'fixed',
+      inset: '0',
+      pointerEvents: 'none',
+      zIndex: '2147483000',
+      contain: 'layout style',
+    });
+    for (const property of options.inheritProperties ?? []) {
+      overlay.style.setProperty(property, sourceStyle.getPropertyValue(property));
+    }
+
+    const preview = options.renderPreview?.(registration.element) ?? cloneForPreview(registration.element);
+    for (const property of inheritedText) {
+      preview.style.setProperty(property, sourceStyle.getPropertyValue(property));
+    }
+    preview.setAttribute('data-drag-preview', '');
+    preview.setAttribute('aria-hidden', 'true');
+    Object.assign(preview.style, {
+      position: 'absolute',
+      left: `${liftBox.left}px`,
+      top: `${liftBox.top}px`,
+      width: `${liftBox.width}px`,
+      height: `${liftBox.height}px`,
+      margin: '0',
+      boxSizing: 'border-box',
+      translate: 'none',
+      transform: 'translate3d(0, 0, 0)',
+      transition: 'none',
+      willChange: 'transform',
+      pointerEvents: 'none',
+    });
+    overlay.append(preview);
+    document.body.append(overlay);
+
+    const element = registration.element;
+    session = {
+      item: registration,
+      pointerId,
+      startX,
+      startY,
+      lastX: startX,
+      lastY: startY,
+      liftBox,
+      sourceIndex,
+      home,
+      containers: snapshots,
+      scrollers: [...scrollers.values()],
+      windowLiftX: view.scrollX,
+      windowLiftY: view.scrollY,
+      overlay,
+      preview,
+      destination: { container: home, index: sourceIndex },
+      shifts: new Map(),
+      sourceVisibility: element.style.visibility,
+      reserved: null,
+      scrollFrame: null,
+      impactFrame: null,
+      dropping: false,
+    };
+
+    element.style.visibility = 'hidden';
+    element.setAttribute('data-drag-source', '');
+    home.registration.element.setAttribute('data-drag-over', '');
+    document.documentElement.setAttribute('data-drag-active', registration.type);
+
+    options.onDragStart?.(startOf(session));
+  }
+
+  function move(clientX: number, clientY: number): void {
+    const current = session;
+    if (!current) return;
+    current.lastX = clientX;
+    current.lastY = clientY;
+    current.preview.style.transform = `translate3d(${clientX - current.startX}px, ${clientY - current.startY}px, 0)`;
+    updateImpact(current);
+    scheduleAutoScroll(current);
+  }
+
+  /** Where the lifted item is now in each container, scroll taken into account. */
+  function offsetOf(current: Session, snapshot: ContainerSnapshot): { x: number; y: number } {
+    const view = current.overlay.ownerDocument.defaultView ?? window;
+    let x = view.scrollX - current.windowLiftX;
+    let y = view.scrollY - current.windowLiftY;
+    const scroller = snapshot.scroller;
+    if (scroller?.element) {
+      x += scroller.element.scrollLeft - scroller.liftLeft;
+      y += scroller.element.scrollTop - scroller.liftTop;
+    }
+    return { x, y };
+  }
+
+  function containerBox(current: Session, snapshot: ContainerSnapshot): Box {
+    const offset = offsetOf(current, snapshot);
+    const box = snapshot.box;
+    const scroller = snapshot.scroller;
+    const visible = { ...box, left: box.left - offset.x, top: box.top - offset.y };
+    if (!scroller?.element) return visible;
+    return intersect(visible, scroller.box);
+  }
+
+  function updateImpact(current: Session): void {
+    const pointerX = current.lastX;
+    const pointerY = current.lastY;
+    let over: ContainerSnapshot | null = null;
+    let overArea = Infinity;
+
+    for (const snapshot of current.containers) {
+      if (snapshot.registration.isDropDisabled()) continue;
+      const box = containerBox(current, snapshot);
+      if (!contains(box, pointerX, pointerY)) continue;
+      const area = box.width * box.height;
+      if (area < overArea) {
+        over = snapshot;
+        overArea = area;
+      }
+    }
+
+    let next: Session['destination'] = null;
+    if (over) next = { container: over, index: indexIn(current, over) };
+
+    const previous = current.destination;
+    if (previous?.container === next?.container && previous?.index === next?.index) return;
+    current.destination = next;
+    applyShifts(current, previous?.container ?? null);
+    options.onDragUpdate?.(updateOf(current));
+  }
+
+  /** The lifted item's index in a container, with Pangea's hysteresis. */
+  function indexIn(current: Session, snapshot: ContainerSnapshot): number {
+    const vertical = snapshot.registration.axis === 'vertical';
+    const offset = offsetOf(current, snapshot);
+    const liftStart = vertical ? current.liftBox.top : current.liftBox.left;
+    const size = vertical ? current.liftBox.height : current.liftBox.width;
+    const moved = vertical ? current.lastY - current.startY : current.lastX - current.startX;
+    const draggedStart = liftStart + moved;
+    const draggedEnd = draggedStart + size;
+    const scrolled = vertical ? offset.y : offset.x;
+    const centres = snapshot.slots.map((slot) => baselineStart(current, snapshot, slot) - scrolled + (vertical ? slot.box.height : slot.box.width) / 2);
+    const count = centres.length;
+
+    if (current.destination?.container !== snapshot) {
+      const centre = (draggedStart + draggedEnd) / 2;
+      return centres.filter((value) => value < centre).length;
+    }
+
+    let index = current.destination.index;
+    // Moving back: a sibling before the gap moves once the leading edge passes its centre.
+    while (index > 0 && draggedStart < centres[index - 1]) index--;
+    if (index !== current.destination.index) return index;
+    // Moving on: a sibling after the gap, displaced by the room, moves once the trailing edge passes its displaced centre.
+    while (index < count && draggedEnd > centres[index] + snapshot.room) index++;
+    return index;
+  }
+
+  /** A slot's start along the axis with the source's room closed, at lift scroll. */
+  function baselineStart(current: Session, snapshot: ContainerSnapshot, slot: Slot): number {
+    const vertical = snapshot.registration.axis === 'vertical';
+    const start = vertical ? slot.box.top : slot.box.left;
+    return snapshot.isHome && slot.original > current.sourceIndex ? start - snapshot.room : start;
+  }
+
+  function applyShifts(current: Session, previous: ContainerSnapshot | null): void {
+    const destination = current.destination;
+    const touched = new Set<ContainerSnapshot>([current.home]);
+    if (previous) touched.add(previous);
+    if (destination) touched.add(destination.container);
+
+    for (const snapshot of touched) {
+      snapshot.slots.forEach((slot, position) => {
+        let value = 0;
+        if (snapshot.isHome && slot.original > current.sourceIndex) value -= snapshot.room;
+        if (destination?.container === snapshot && position >= destination.index) value += snapshot.room;
+        shift(current, slot.item.element, value, snapshot.registration.axis);
+      });
+    }
+
+    const foreign = destination && !destination.container.isHome ? destination.container : null;
+    if (current.reserved !== foreign) {
+      current.reserved?.registration.element.style.removeProperty('--drag-reserve');
+      current.reserved?.registration.element.removeAttribute('data-drag-over');
+      if (foreign) {
+        foreign.registration.element.style.setProperty('--drag-reserve', `${foreign.room}px`);
+      }
+      current.reserved = foreign;
+    }
+    for (const snapshot of current.containers) {
+      const isOver = destination?.container === snapshot;
+      if (isOver) snapshot.registration.element.setAttribute('data-drag-over', '');
+      else snapshot.registration.element.removeAttribute('data-drag-over');
+    }
+  }
+
+  function shift(current: Session, element: HTMLElement, value: number, axis: SortableAxis): void {
+    const existing = current.shifts.get(element);
+    if ((existing?.value ?? 0) === value) return;
+    if (!existing) {
+      current.shifts.set(element, {
+        value,
+        translate: element.style.translate,
+        transition: element.style.transition,
+      });
+      const { duration, easing } = settings.outOfTheWay;
+      element.style.transition = reducedMotion ? 'none' : `translate ${duration}ms ${easing}`;
+    } else {
+      existing.value = value;
+    }
+    element.style.translate = value === 0 ? 'none' : axis === 'vertical' ? `0 ${value}px` : `${value}px 0`;
+  }
+
+  function scheduleAutoScroll(current: Session): void {
+    if (current.scrollFrame !== null) return;
+    const view = current.overlay.ownerDocument.defaultView;
+    if (!view) return;
+    const step = () => {
+      if (session !== current || current.dropping) return;
+      current.scrollFrame = null;
+      if (autoScroll(current)) {
+        updateImpact(current);
+        current.scrollFrame = view.requestAnimationFrame(step);
+      }
+    };
+    if (edgeSpeed(current, current.destination?.container.scroller ?? null, view)) {
+      current.scrollFrame = view.requestAnimationFrame(step);
+    }
+  }
+
+  function autoScroll(current: Session): boolean {
+    const view = current.overlay.ownerDocument.defaultView;
+    if (!view) return false;
+    const scroller = current.destination?.container.scroller ?? null;
+    const speed = edgeSpeed(current, scroller, view);
+    if (!speed) return false;
+    if (scroller?.element) {
+      const before = { left: scroller.element.scrollLeft, top: scroller.element.scrollTop };
+      scroller.element.scrollBy(speed.x, speed.y);
+      if (scroller.element.scrollLeft !== before.left || scroller.element.scrollTop !== before.top) return true;
+    }
+    const windowSpeed = edgeSpeed(current, null, view);
+    if (!windowSpeed) return false;
+    const before = { x: view.scrollX, y: view.scrollY };
+    view.scrollBy(windowSpeed.x, windowSpeed.y);
+    return view.scrollX !== before.x || view.scrollY !== before.y;
+  }
+
+  function edgeSpeed(current: Session, scroller: Scroller | null, view: Window): { x: number; y: number } | null {
+    const box = scroller?.element ? scroller.box : { left: 0, top: 0, width: view.innerWidth, height: view.innerHeight };
+    const edge = settings.autoScrollEdge;
+    const along = (position: number, start: number, length: number) => {
+      const fromStart = position - start;
+      const fromEnd = start + length - position;
+      if (fromStart < edge) return -maxScrollSpeed * ((edge - Math.max(fromStart, 0)) / edge) ** 2;
+      if (fromEnd < edge) return maxScrollSpeed * ((edge - Math.max(fromEnd, 0)) / edge) ** 2;
+      return 0;
+    };
+    const x = along(current.lastX, box.left, box.width);
+    const y = along(current.lastY, box.top, box.height);
+    return x || y ? { x, y } : null;
+  }
+
+  function drop(reason: SortableResult['reason']): void {
+    const current = session;
+    if (!current || current.dropping) return;
+    current.dropping = true;
+    if (current.scrollFrame !== null) cancelAnimationFrame(current.scrollFrame);
+    if (current.impactFrame !== null) cancelAnimationFrame(current.impactFrame);
+
+    // A cancel, or a drop outside every list, sends the item home.
+    const returning = reason === 'CANCEL' || !current.destination;
+    if (returning) {
+      const previous = current.destination?.container ?? null;
+      current.destination = { container: current.home, index: current.sourceIndex };
+      applyShifts(current, previous);
+    }
+
+    const target = targetPosition(current);
+    const from = parseTranslate(current.preview.style.transform);
+    const distance = Math.hypot(target.x - from.x, target.y - from.y);
+    const { minDuration, maxDuration, easing } = settings.drop;
+    const duration = distance < 0.5 || reducedMotion ? 0 : minDuration + (maxDuration - minDuration) * Math.min(distance / maxDropDistance, 1);
+
+    const result: SortableResult = {
+      ...startOf(current),
+      destination: returning || !current.destination ? null : locationOf(current.destination),
+      reason,
+    };
+
+    if (duration === 0) {
+      finish(current, result);
+      return;
+    }
+    current.preview.style.transition = `transform ${duration}ms ${easing}`;
+    current.preview.style.transform = `translate3d(${target.x}px, ${target.y}px, 0)`;
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      finish(current, result);
+    };
+    current.preview.addEventListener('transitionend', done, { once: true });
+    setTimeout(done, duration + 50);
+  }
+
+  /** Where the preview lands, as its translation from the lift position. */
+  function targetPosition(current: Session): { x: number; y: number } {
+    const destination = current.destination ?? { container: current.home, index: current.sourceIndex };
+    const snapshot = destination.container;
+    const vertical = snapshot.registration.axis === 'vertical';
+    const offset = offsetOf(current, snapshot);
+    const slots = snapshot.slots;
+    let start: number;
+
+    if (snapshot.isHome && destination.index === current.sourceIndex) {
+      start = vertical ? current.liftBox.top : current.liftBox.left;
+    } else if (destination.index < slots.length) {
+      start = baselineStart(current, snapshot, slots[destination.index]);
+    } else if (slots.length > 0) {
+      // After the last sibling: its size and the lifted item's room beyond its own size.
+      const last = slots[slots.length - 1];
+      const size = vertical ? current.liftBox.height : current.liftBox.width;
+      start = baselineStart(current, snapshot, last) + (vertical ? last.box.height : last.box.width) + snapshot.room - size;
+    } else {
+      start = (vertical ? snapshot.box.top : snapshot.box.left) + snapshot.paddingStart + snapshot.marginStart;
+    }
+
+    // Across the axis the item keeps where it stood in its own list.
+    const crossInHome = vertical ? current.liftBox.left - current.home.box.left : current.liftBox.top - current.home.box.top;
+    const cross = snapshot.isHome
+      ? vertical
+        ? current.liftBox.left
+        : current.liftBox.top
+      : (vertical ? snapshot.box.left : snapshot.box.top) + crossInHome;
+
+    // Boxes were measured at lift; take away what has scrolled since.
+    const startNow = start - (vertical ? offset.y : offset.x);
+    const crossNow = cross - (vertical ? offset.x : offset.y);
+    return {
+      x: (vertical ? crossNow : startNow) - current.liftBox.left,
+      y: (vertical ? startNow : crossNow) - current.liftBox.top,
+    };
+  }
+
+  function finish(current: Session, result: SortableResult): void {
+    try {
+      options.onDragEnd?.(result);
+    } finally {
+      cleanup(current);
+    }
+  }
+
+  function cleanup(current: Session): void {
+    const element = current.item.element;
+    const view = current.overlay.ownerDocument.defaultView ?? window;
+    for (const [shifted, saved] of current.shifts) {
+      shifted.style.transition = 'none';
+      shifted.style.translate = saved.translate;
+    }
+    const restored = [...current.shifts];
+    view.requestAnimationFrame(() => {
+      view.requestAnimationFrame(() => {
+        for (const [shifted, saved] of restored) shifted.style.transition = saved.transition;
+      });
+    });
+    element.style.visibility = current.sourceVisibility;
+    element.removeAttribute('data-drag-source');
+    current.reserved?.registration.element.style.removeProperty('--drag-reserve');
+    for (const snapshot of current.containers) snapshot.registration.element.removeAttribute('data-drag-over');
+    current.overlay.remove();
+    element.ownerDocument.documentElement.removeAttribute('data-drag-active');
+    session = null;
+    removeWindowListeners();
+  }
+
+  function closestContainer(registration: ItemRegistration): ContainerRegistration | null {
+    let element = registration.element.parentElement;
+    while (element) {
+      const candidate = containers.get(element);
+      if (candidate && candidate.type === registration.type) return candidate;
+      element = element.parentElement;
+    }
+    return null;
+  }
+
+  function itemsOf(registration: ContainerRegistration): ItemRegistration[] {
+    const members: ItemRegistration[] = [];
+    for (const candidate of items.values()) {
+      if (candidate.type !== registration.type || !candidate.element.isConnected) continue;
+      if (closestContainer(candidate) === registration) members.push(candidate);
+    }
+    return members.sort((a, b) =>
+      a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+    );
+  }
+
+  function startOf(current: Session): SortableStart {
+    return {
+      draggableId: current.item.id,
+      type: current.item.type,
+      source: { droppableId: current.home.registration.id, index: current.sourceIndex },
+      mode: 'FLUID',
+    };
+  }
+
+  function updateOf(current: Session): SortableUpdate {
+    return {
+      ...startOf(current),
+      destination: current.destination ? locationOf(current.destination) : null,
+    };
+  }
+
+  function locationOf(destination: NonNullable<Session['destination']>): SortableLocation {
+    return { droppableId: destination.container.registration.id, index: destination.index };
+  }
+
+  return {
+    container,
+    item,
+    isDragging: () => session !== null,
+    cancel: () => {
+      clearPending();
+      if (session && !session.dropping) drop('CANCEL');
+    },
+    destroy: () => {
+      destroyed = true;
+      clearPending();
+      if (session) cleanup(session);
+      document.removeEventListener('pointerdown', onPointerDown);
+      listening = false;
+      containers.clear();
+      items.clear();
+      handles.clear();
+    },
+  };
+}
+
+function measure(element: HTMLElement): Box {
+  const rect = element.getBoundingClientRect();
+  return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+}
+
+function intersect(a: Box, b: Box): Box {
+  const left = Math.max(a.left, b.left);
+  const top = Math.max(a.top, b.top);
+  const right = Math.min(a.left + a.width, b.left + b.width);
+  const bottom = Math.min(a.top + a.height, b.top + b.height);
+  return { left, top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) };
+}
+
+function contains(box: Box, x: number, y: number): boolean {
+  return x >= box.left && x < box.left + box.width && y >= box.top && y < box.top + box.height;
+}
+
+function parsePixels(value: string): number {
+  const number = Number.parseFloat(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function parseTranslate(transform: string): { x: number; y: number } {
+  const match = /translate3d\(\s*(-?[\d.]+)px,\s*(-?[\d.]+)px/.exec(transform);
+  return match ? { x: Number(match[1]), y: Number(match[2]) } : { x: 0, y: 0 };
+}
+
+function scrollParent(element: HTMLElement): HTMLElement | null {
+  const view = element.ownerDocument.defaultView;
+  let parent = element.parentElement;
+  while (parent && parent !== element.ownerDocument.body && parent !== element.ownerDocument.documentElement) {
+    const style = view?.getComputedStyle(parent);
+    const scrolls = (value: string | undefined) => value === 'auto' || value === 'scroll' || value === 'overlay';
+    if (style && (scrolls(style.overflowY) || scrolls(style.overflowX))) return parent;
+    parent = parent.parentElement;
+  }
+  return null;
+}
+
+function cloneForPreview(source: HTMLElement): HTMLElement {
+  const clone = source.cloneNode(true) as HTMLElement;
+  clone.removeAttribute('id');
+  clone.removeAttribute('data-drag-source');
+  clone.style.visibility = 'visible';
+  for (const element of clone.querySelectorAll('[id]')) element.removeAttribute('id');
+  for (const element of clone.querySelectorAll('[data-drag-handle]')) element.removeAttribute('data-drag-handle');
+  clone.removeAttribute('data-drag-handle');
+  return clone;
+}
