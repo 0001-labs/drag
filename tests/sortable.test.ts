@@ -210,6 +210,16 @@ describe('createSortable', () => {
     expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 1 });
   });
 
+  it('keeps the lifted item on its line when asked', () => {
+    sortable.destroy();
+    sortable = createSortable({ lockAxis: 'y' });
+    const a = column('a', 0, 3);
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 60, 40);
+    expect(document.querySelector<HTMLElement>('[data-drag-preview]')?.style.transform).toBe('translate3d(0px, 30px, 0)');
+  });
+
   describe('with the keyboard', () => {
     const key = (target: EventTarget, name: string) =>
       target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }));

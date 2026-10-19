@@ -99,6 +99,8 @@ export type SortableOptions = {
   drop?: { minDuration: number; maxDuration: number; easing: string };
   /** How near an edge, in pixels, the pointer scrolls the list or the page. */
   autoScrollEdge?: number;
+  /** Keep the lifted item on one line as the pointer moves: across ('x') or down ('y'). */
+  lockAxis?: 'x' | 'y';
   /** Custom properties copied from the source item onto the overlay. */
   inheritProperties?: string[];
   /** The element drawn under the pointer; a clone of the item by default. */
@@ -676,7 +678,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (!current) return;
     current.lastX = clientX;
     current.lastY = clientY;
-    current.preview.style.transform = previewTransform(clientX - current.startX, clientY - current.startY, current.previewScale);
+    const x = options.lockAxis === 'y' ? 0 : clientX - current.startX;
+    const y = options.lockAxis === 'x' ? 0 : clientY - current.startY;
+    current.preview.style.transform = previewTransform(x, y, current.previewScale);
     updateImpact(current);
     scheduleAutoScroll(current);
   }
@@ -833,7 +837,10 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const offset = offsetOf(current, snapshot);
     const liftStart = vertical ? current.liftBox.top : current.liftBox.left;
     const size = vertical ? current.liftBox.height : current.liftBox.width;
-    const moved = vertical ? current.lastY - current.startY : current.lastX - current.startX;
+    const moved =
+      vertical
+        ? options.lockAxis === 'x' ? 0 : current.lastY - current.startY
+        : options.lockAxis === 'y' ? 0 : current.lastX - current.startX;
     const draggedStart = liftStart + moved;
     const draggedEnd = draggedStart + size;
     const scrolled = vertical ? offset.y : offset.x;
