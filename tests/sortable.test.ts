@@ -281,6 +281,85 @@ describe('createSortable', () => {
     expect(document.querySelector<HTMLElement>('[data-drag-preview]')?.style.transform).toBe('translate3d(0px, 30px, 0)');
   });
 
+  describe('combining', () => {
+    let combines: Array<{ draggableId: string; droppableId: string } | null>;
+
+    beforeEach(() => {
+      sortable.destroy();
+      combines = [];
+      sortable = createSortable({
+        onDragUpdate: (update) => {
+          updates.push(update.destination);
+          combines.push(update.combine);
+        },
+        onDragEnd: (result) => ended.push(result),
+      });
+    });
+
+    const combinable = (layout: Layout, id: string) => {
+      sortable.container({ element: layout.list, id, type: 'cell', isCombineEnabled: () => true });
+      layout.cells.forEach((cell, index) => sortable.item({ element: cell, id: `${id}${index}`, type: 'cell' }));
+    };
+
+    it('combines once the leading edge is inside the middle half of the next item', () => {
+      const a = column('a', 0, 4);
+      combinable(a, 'a');
+      pointer('pointerdown', a.cells[0], 10, 10);
+      // The bottom edge at 27: inside 24.75 to 34.25, the middle half of a1 where it stands.
+      pointer('pointermove', window, 10, 18);
+      expect(combines.at(-1)).toEqual({ draggableId: 'a1', droppableId: 'a' });
+      expect(updates.at(-1)).toBeNull();
+      expect(a.cells[1].hasAttribute('data-drag-combine')).toBe(true);
+      // Past it, the item goes back to moving between the others.
+      pointer('pointermove', window, 10, 26);
+      expect(combines.at(-1)).toBeNull();
+      expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 1 });
+      expect(a.cells[1].hasAttribute('data-drag-combine')).toBe(false);
+    });
+
+    it('drops onto the item it is held over', () => {
+      const a = column('a', 0, 3);
+      combinable(a, 'a');
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 10, 18);
+      pointer('pointerup', window, 10, 18);
+      vi.runAllTimers();
+      expect(ended[0]).toEqual(
+        expect.objectContaining({ reason: 'DROP', destination: null, combine: { draggableId: 'a1', droppableId: 'a' } }),
+      );
+      expect(a.cells[1].hasAttribute('data-drag-combine')).toBe(false);
+    });
+
+    it('never combines where the list does not allow it', () => {
+      const a = column('a', 0, 3);
+      register(sortable, a, 'a');
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 10, 18);
+      expect(combines.filter(Boolean)).toEqual([]);
+    });
+  });
+
+  it('lets the page draw itself before the lift is measured', () => {
+    sortable.destroy();
+    const calls: string[] = [];
+    const a = column('a', 0, 4);
+    sortable = createSortable({
+      onDragUpdate: (update) => updates.push(update.destination),
+      // A selection folded into the row that carries it: a2 leaves the list before the lift.
+      onBeforeCapture: ({ draggableId, mode }) => {
+        calls.push(`${draggableId}:${mode}`);
+        a.cells[2].remove();
+      },
+      onDragStart: () => calls.push('start'),
+    });
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 100);
+    expect(calls).toEqual(['a0:FLUID', 'start']);
+    // Only a1 and a3 are left to pass: the end of the list is index 2.
+    expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 2 });
+  });
+
   describe('with the keyboard', () => {
     const key = (target: EventTarget, name: string) =>
       target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }));

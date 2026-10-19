@@ -21,7 +21,9 @@ export * from './sortable';
 
 const Sortable = createContext<SortableController | null>(null);
 
-export type SortableProviderProps = Omit<SortableOptions, 'onDragStart' | 'onDragUpdate' | 'onDragEnd'> & {
+export type SortableProviderProps = Omit<SortableOptions, 'onBeforeCapture' | 'onDragStart' | 'onDragUpdate' | 'onDragEnd'> & {
+  /** Change state here before the lift is measured; it is drawn at once. */
+  onBeforeCapture?: (before: { draggableId: string; mode: SortableStart['mode'] }) => void;
   onDragStart?: (start: SortableStart) => void;
   onDragUpdate?: (update: SortableUpdate) => void;
   /** Update state here; it is drawn at once so the engine's offsets can go. */
@@ -30,14 +32,18 @@ export type SortableProviderProps = Omit<SortableOptions, 'onDragStart' | 'onDra
 };
 
 /** One engine for the lists inside it; its options are read when it mounts. */
-export function SortableProvider({ onDragStart, onDragUpdate, onDragEnd, children, ...options }: SortableProviderProps) {
-  const callbacks = useRef({ onDragStart, onDragUpdate, onDragEnd });
-  callbacks.current = { onDragStart, onDragUpdate, onDragEnd };
+export function SortableProvider({ onBeforeCapture, onDragStart, onDragUpdate, onDragEnd, children, ...options }: SortableProviderProps) {
+  const callbacks = useRef({ onBeforeCapture, onDragStart, onDragUpdate, onDragEnd });
+  callbacks.current = { onBeforeCapture, onDragStart, onDragUpdate, onDragEnd };
   const initial = useRef(options);
   const controller = useMemo(
     () =>
       createSortable({
         ...initial.current,
+        onBeforeCapture: (before) => {
+          const callback = callbacks.current.onBeforeCapture;
+          if (callback) flushSync(() => callback(before));
+        },
         onDragStart: (start) => callbacks.current.onDragStart?.(start),
         onDragUpdate: (update) => callbacks.current.onDragUpdate?.(update),
         onDragEnd: (result) => flushSync(() => callbacks.current.onDragEnd?.(result)),
@@ -58,6 +64,7 @@ export type UseSortableContainerOptions = {
   type?: string;
   axis?: SortableAxis;
   isDropDisabled?: () => boolean;
+  isCombineEnabled?: () => boolean;
   label?: string;
 };
 
@@ -76,6 +83,7 @@ export function useSortableContainer<T extends HTMLElement>(id: string, options:
         ...(type === undefined ? {} : { type }),
         ...(axis === undefined ? {} : { axis }),
         isDropDisabled: () => latest.current.isDropDisabled?.() ?? false,
+        isCombineEnabled: () => latest.current.isCombineEnabled?.() ?? false,
         ...(latest.current.label === undefined ? {} : { label: latest.current.label }),
       });
     },
