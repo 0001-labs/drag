@@ -1,6 +1,6 @@
 {
   "name": "@0001-labs/drag",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha.0",
   "description": "A small framework-agnostic drag-and-drop engine with Web Component helpers.",
   "type": "module",
   "license": "MIT",
