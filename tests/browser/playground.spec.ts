@@ -61,6 +61,20 @@ for (const engine of engines) {
       await expect(week.locator('.play-column__name').first()).toHaveText('Tuesday');
     });
 
+    test('moves a cell with the keyboard', async ({ page }) => {
+      await page.getByText('Write the brief', { exact: true }).focus();
+      await page.keyboard.press('Space');
+      await page.waitForTimeout(300);
+      for (const key of ['ArrowDown', 'ArrowDown', 'ArrowRight']) {
+        await page.keyboard.press(key);
+        await page.waitForTimeout(300);
+      }
+      await page.keyboard.press('Space');
+      await page.waitForTimeout(700);
+      expect(await cellTitles(page, 'Week', 'Tuesday')).toContain('Write the brief');
+      expect(await cellTitles(page, 'Week', 'Monday')).not.toContain('Write the brief');
+    });
+
     test('measures the drag', async ({ page }) => {
       const cells = column(page, 'Week', 'Monday').locator('.play-cell');
       const target = await cells.nth(3).boundingBox();

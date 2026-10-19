@@ -175,4 +175,82 @@ describe('createSortable', () => {
     pointer('pointermove', window, 10, 30);
     expect(sortable.isDragging()).toBe(false);
   });
+
+  describe('with the keyboard', () => {
+    const key = (target: EventTarget, name: string) =>
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }));
+    const spoken = () => document.querySelector('[aria-live="assertive"]')?.textContent;
+
+    it('makes handles reachable and says how to lift them', () => {
+      const a = column('a', 0, 2);
+      register(sortable, a, 'a');
+      const cell = a.cells[0];
+      expect(cell.tabIndex).toBe(0);
+      const described = document.getElementById(cell.getAttribute('aria-describedby') ?? '');
+      expect(described?.textContent).toContain('Press space to lift');
+    });
+
+    it('lifts with space, moves a slot with each arrow and drops with space', () => {
+      const a = column('a', 0, 4);
+      register(sortable, a, 'a');
+      sortable.container({ element: a.list, id: 'a', type: 'cell', label: 'Monday' });
+      key(a.cells[0], ' ');
+      expect(sortable.isDragging()).toBe(true);
+      expect(spoken()).toBe('Lifted a0, position 1 of 4 in Monday.');
+      key(document.body, 'ArrowDown');
+      key(document.body, 'ArrowDown');
+      expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 2 });
+      expect(spoken()).toBe('a0, position 3 of 4 in Monday.');
+      expect(a.cells[1].style.translate).toBe('0 -20px');
+      expect(a.cells[3].style.translate).toBe('');
+      key(document.body, 'ArrowUp');
+      key(document.body, ' ');
+      vi.runAllTimers();
+      expect(ended[0]).toEqual(
+        expect.objectContaining({ mode: 'SNAP', reason: 'DROP', destination: { droppableId: 'a', index: 1 } }),
+      );
+      expect(spoken()).toBe('Dropped a0 at position 2 of 4 in Monday.');
+      expect(document.activeElement).toBe(a.cells[0]);
+    });
+
+    it('moves across to the list beside it', () => {
+      const a = column('a', 0, 3);
+      const b = column('b', 100, 3);
+      register(sortable, a, 'a');
+      register(sortable, b, 'b');
+      key(a.cells[1], ' ');
+      key(document.body, 'ArrowRight');
+      expect(updates.at(-1)).toEqual({ droppableId: 'b', index: 1 });
+      key(document.body, 'ArrowLeft');
+      expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 1 });
+    });
+
+    it('keeps the arrows to the ends of a list', () => {
+      const a = column('a', 0, 2);
+      register(sortable, a, 'a');
+      key(a.cells[0], ' ');
+      key(document.body, 'ArrowUp');
+      expect(updates).toEqual([]);
+    });
+
+    it('cancels with escape and says where the item is', () => {
+      const a = column('a', 0, 3);
+      register(sortable, a, 'a');
+      key(a.cells[0], ' ');
+      key(document.body, 'ArrowDown');
+      key(document.body, 'Escape');
+      vi.runAllTimers();
+      expect(ended[0]).toEqual(expect.objectContaining({ reason: 'CANCEL', destination: null }));
+      expect(spoken()).toBe('a0 is back at position 1 of 3 in a.');
+    });
+
+    it('leaves space alone in a field inside the item', () => {
+      const a = column('a', 0, 2);
+      const field = document.createElement('input');
+      a.cells[0].append(field);
+      register(sortable, a, 'a');
+      key(field, ' ');
+      expect(sortable.isDragging()).toBe(false);
+    });
+  });
 });

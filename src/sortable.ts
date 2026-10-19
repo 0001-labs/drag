@@ -25,7 +25,8 @@ export type SortableStart = {
   draggableId: string;
   type: string;
   source: SortableLocation;
-  mode: 'FLUID';
+  /** A pointer moves the item freely; the keyboard moves it a slot at a time. */
+  mode: 'FLUID' | 'SNAP';
 };
 
 export type SortableUpdate = SortableStart & {
@@ -42,6 +43,8 @@ export type SortableContainerArgs = {
   type?: string;
   axis?: SortableAxis;
   isDropDisabled?: () => boolean;
+  /** The list's name in announcements; its aria-label or id when left out. */
+  label?: string;
 };
 
 export type SortableItemArgs = {
@@ -53,6 +56,26 @@ export type SortableItemArgs = {
   canDrag?: () => boolean;
   /** Let a press on a button, field or link inside the handle start a drag. */
   allowInteractive?: boolean;
+  /** The item's name in announcements; its aria-label or text when left out. */
+  label?: string;
+};
+
+/** What an announcement is about. Positions count from one. */
+export type SortableAnnouncement = {
+  item: string;
+  list: string;
+  position: number;
+  count: number;
+};
+
+/** What a screen reader hears, in the product's own words and language. */
+export type SortableMessages = {
+  instructions: string;
+  lifted: (at: SortableAnnouncement) => string;
+  moved: (at: SortableAnnouncement) => string;
+  outside: (item: string) => string;
+  dropped: (at: SortableAnnouncement) => string;
+  returned: (at: SortableAnnouncement) => string;
 };
 
 export type SortableOptions = {
@@ -79,6 +102,8 @@ export type SortableOptions = {
   inheritProperties?: string[];
   /** The element drawn under the pointer; a clone of the item by default. */
   renderPreview?: (source: HTMLElement) => HTMLElement;
+  /** Announcements and the keyboard instructions; English by default. */
+  messages?: Partial<SortableMessages>;
 };
 
 export type SortableController = {
@@ -87,6 +112,15 @@ export type SortableController = {
   isDragging: () => boolean;
   cancel: () => void;
   destroy: () => void;
+};
+
+const defaultMessages: SortableMessages = {
+  instructions: 'Press space to lift. Then use the arrow keys to move, space to drop and escape to cancel.',
+  lifted: (at) => `Lifted ${at.item}, position ${at.position} of ${at.count} in ${at.list}.`,
+  moved: (at) => `${at.item}, position ${at.position} of ${at.count} in ${at.list}.`,
+  outside: (item) => `${item} is outside every list.`,
+  dropped: (at) => `Dropped ${at.item} at position ${at.position} of ${at.count} in ${at.list}.`,
+  returned: (at) => `${at.item} is back at position ${at.position} of ${at.count} in ${at.list}.`,
 };
 
 const defaults = {
@@ -108,13 +142,15 @@ const handleStyles = `
 :root[data-drag-active],:root[data-drag-active] *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important}
 `;
 
-type ContainerRegistration = Required<Omit<SortableContainerArgs, 'isDropDisabled'>> & {
+type ContainerRegistration = Required<Omit<SortableContainerArgs, 'isDropDisabled' | 'label'>> & {
   isDropDisabled: () => boolean;
+  label: () => string;
 };
 
-type ItemRegistration = Required<Omit<SortableItemArgs, 'handle' | 'canDrag'>> & {
+type ItemRegistration = Required<Omit<SortableItemArgs, 'handle' | 'canDrag' | 'label'>> & {
   handle: HTMLElement;
   canDrag: () => boolean;
+  label: () => string;
 };
 
 type Box = { left: number; top: number; width: number; height: number };
@@ -159,6 +195,7 @@ type Pending = {
 
 type Session = {
   item: ItemRegistration;
+  mode: SortableStart['mode'];
   pointerId: number;
   startX: number;
   startY: number;
@@ -190,6 +227,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     drop: options.drop ?? defaults.drop,
     autoScrollEdge: options.autoScrollEdge ?? defaults.autoScrollEdge,
   };
+  const messages: SortableMessages = { ...defaultMessages, ...options.messages };
   const containers = new Map<HTMLElement, ContainerRegistration>();
   const items = new Map<HTMLElement, ItemRegistration>();
   const handles = new Map<HTMLElement, ItemRegistration>();
@@ -198,6 +236,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   let listening = false;
   let destroyed = false;
   let reducedMotion = false;
+  let instructions: HTMLElement | null = null;
+  let liveRegion: HTMLElement | null = null;
 
   function container(args: SortableContainerArgs): Cleanup {
     const registration: ContainerRegistration = {
@@ -206,6 +246,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       type: args.type ?? 'default',
       axis: args.axis ?? 'vertical',
       isDropDisabled: args.isDropDisabled ?? (() => false),
+      label: () => args.label ?? args.element.getAttribute('aria-label') ?? args.id,
     };
     containers.set(args.element, registration);
     return once(() => {
@@ -222,16 +263,27 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       handle,
       canDrag: args.canDrag ?? (() => true),
       allowInteractive: args.allowInteractive ?? false,
+      label: () => args.label ?? labelOf(args.element, handle),
     };
     items.set(args.element, registration);
     handles.set(handle, registration);
     handle.setAttribute('data-drag-handle', '');
+    // The keyboard reaches the handle, and a screen reader says how to lift it.
+    const addedTabIndex = !handle.hasAttribute('tabindex') && !handle.matches(interactive);
+    if (addedTabIndex) handle.tabIndex = 0;
+    const describedBy = handle.getAttribute('aria-describedby');
     installDocument(handle.ownerDocument);
+    if (instructions) {
+      handle.setAttribute('aria-describedby', [describedBy, instructions.id].filter(Boolean).join(' '));
+    }
     return once(() => {
       if (items.get(args.element) === registration) items.delete(args.element);
       if (handles.get(handle) === registration) {
         handles.delete(handle);
         handle.removeAttribute('data-drag-handle');
+        if (addedTabIndex) handle.removeAttribute('tabindex');
+        if (describedBy) handle.setAttribute('aria-describedby', describedBy);
+        else handle.removeAttribute('aria-describedby');
       }
     });
   }
@@ -240,12 +292,50 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (listening) return;
     listening = true;
     document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onHandleKeyDown);
     if (!document.querySelector(`style[${handleStyleId}]`)) {
       const style = document.createElement('style');
       style.setAttribute(handleStyleId, '');
       style.textContent = handleStyles;
       document.head.append(style);
     }
+    instructions = hiddenText(document, `0001-drag-instructions-${++instanceCount}`);
+    instructions.textContent = messages.instructions;
+    liveRegion = hiddenText(document, `0001-drag-live-${instanceCount}`);
+    liveRegion.setAttribute('aria-live', 'assertive');
+    liveRegion.setAttribute('aria-atomic', 'true');
+  }
+
+  function announce(message: string): void {
+    if (liveRegion) liveRegion.textContent = message;
+  }
+
+  function announcement(current: Session): SortableAnnouncement | null {
+    const destination = current.destination;
+    if (!destination) return null;
+    return {
+      item: current.item.label(),
+      list: destination.container.registration.label(),
+      position: destination.index + 1,
+      count: destination.container.slots.length + 1,
+    };
+  }
+
+  function announceMove(current: Session): void {
+    const at = announcement(current);
+    announce(at ? messages.moved(at) : messages.outside(current.item.label()));
+  }
+
+  /** Space on a focused handle lifts its item for the keyboard. */
+  function onHandleKeyDown(event: KeyboardEvent): void {
+    if (destroyed || session || pending || event.key !== ' ' || event.defaultPrevented) return;
+    if (event.target instanceof Element && event.target.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
+    const registration = event.target instanceof HTMLElement ? handles.get(event.target) : undefined;
+    if (!registration || !registration.canDrag()) return;
+    event.preventDefault();
+    addWindowListeners();
+    const box = measure(registration.element);
+    lift(registration, -1, box.left + box.width / 2, box.top + box.height / 2, 'SNAP');
   }
 
   function findHandle(target: EventTarget | null): ItemRegistration | null {
@@ -317,9 +407,23 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   }
 
   function onKeyDown(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && session && !session.dropping) {
+    const current = session;
+    if (!current || current.dropping) return;
+    if (event.key === 'Escape') {
       event.preventDefault();
       drop('CANCEL');
+      return;
+    }
+    if (current.mode !== 'SNAP') return;
+    // While lifted by the keyboard, these keys belong to the drag.
+    if (event.key === ' ' || event.key === 'Enter') {
+      event.preventDefault();
+      drop('DROP');
+    } else if (event.key === 'Tab') {
+      event.preventDefault();
+    } else if (event.key in arrows) {
+      event.preventDefault();
+      moveByKey(current, arrows[event.key as keyof typeof arrows]);
     }
   }
 
@@ -344,7 +448,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     session.impactFrame = view.requestAnimationFrame(() => {
       if (!session) return;
       session.impactFrame = null;
-      updateImpact(session);
+      if (session.mode === 'SNAP') placePreview(session, false);
+      else updateImpact(session);
     });
   }
 
@@ -386,7 +491,13 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     setTimeout(() => window.removeEventListener('click', stop, true), 0);
   }
 
-  function lift(registration: ItemRegistration, pointerId: number, startX: number, startY: number): void {
+  function lift(
+    registration: ItemRegistration,
+    pointerId: number,
+    startX: number,
+    startY: number,
+    mode: SortableStart['mode'] = 'FLUID',
+  ): void {
     if (pending?.timer) clearTimeout(pending.timer);
     pending = null;
 
@@ -497,6 +608,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const element = registration.element;
     session = {
       item: registration,
+      mode,
       pointerId,
       startX,
       startY,
@@ -526,6 +638,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     document.documentElement.setAttribute('data-drag-active', registration.type);
 
     options.onDragStart?.(startOf(session));
+    const lifted = announcement(session);
+    if (lifted) announce(messages.lifted(lifted));
   }
 
   function move(clientX: number, clientY: number): void {
@@ -585,6 +699,102 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     current.destination = next;
     applyShifts(current, previous?.container ?? null);
     options.onDragUpdate?.(updateOf(current));
+    announceMove(current);
+  }
+
+  /**
+   * The keyboard moves the item a slot along its list, or into the nearest
+   * list of its type beside it, where it keeps its height as near as it can.
+   */
+  function moveByKey(current: Session, direction: { x: number; y: number }): void {
+    const from = current.destination ?? { container: current.home, index: current.sourceIndex };
+    const vertical = from.container.registration.axis === 'vertical';
+    const along = vertical ? direction.y : direction.x;
+    let next: NonNullable<Session['destination']> | null = null;
+
+    if (along !== 0) {
+      const index = from.index + along;
+      if (index >= 0 && index <= from.container.slots.length) next = { container: from.container, index };
+    } else {
+      const neighbour = neighbourOf(current, from.container, direction);
+      if (neighbour) next = { container: neighbour, index: indexNear(current, neighbour) };
+    }
+    if (!next) return;
+
+    const previous = current.destination?.container ?? null;
+    current.destination = next;
+    applyShifts(current, previous);
+    placePreview(current, true);
+    revealPreview(current);
+    options.onDragUpdate?.(updateOf(current));
+    announceMove(current);
+  }
+
+  /** The nearest list of the same type in a direction across the axis. */
+  function neighbourOf(current: Session, from: ContainerSnapshot, direction: { x: number; y: number }): ContainerSnapshot | null {
+    const origin = centreOf(containerBox(current, from));
+    let best: ContainerSnapshot | null = null;
+    let bestDistance = Infinity;
+    for (const snapshot of current.containers) {
+      if (snapshot === from || snapshot.registration.isDropDisabled()) continue;
+      const centre = centreOf(containerBox(current, snapshot));
+      const ahead = (centre.x - origin.x) * direction.x + (centre.y - origin.y) * direction.y;
+      if (ahead <= 1) continue;
+      const aside = Math.abs((centre.x - origin.x) * direction.y) + Math.abs((centre.y - origin.y) * direction.x);
+      const distance = ahead + aside * 2;
+      if (distance < bestDistance) {
+        best = snapshot;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }
+
+  /** Where the preview's centre falls among a list's slots. */
+  function indexNear(current: Session, snapshot: ContainerSnapshot): number {
+    const vertical = snapshot.registration.axis === 'vertical';
+    const offset = offsetOf(current, snapshot);
+    const placed = parseTranslate(current.preview.style.transform);
+    const centre = vertical
+      ? current.liftBox.top + placed.y + current.liftBox.height / 2
+      : current.liftBox.left + placed.x + current.liftBox.width / 2;
+    return snapshot.slots.filter((slot) => {
+      const start = baselineStart(current, snapshot, slot) - (vertical ? offset.y : offset.x);
+      return start + (vertical ? slot.box.height : slot.box.width) / 2 < centre;
+    }).length;
+  }
+
+  function placePreview(current: Session, animate: boolean): void {
+    const target = targetPosition(current);
+    const { duration, easing } = settings.outOfTheWay;
+    current.preview.style.transition = animate && !reducedMotion ? `transform ${duration}ms ${easing}` : 'none';
+    current.preview.style.transform = `translate3d(${target.x}px, ${target.y}px, 0)`;
+  }
+
+  /** Scrolls the list, then the page, so the moved item is in view. */
+  function revealPreview(current: Session): void {
+    const view = current.overlay.ownerDocument.defaultView;
+    if (!view) return;
+    const target = targetPosition(current);
+    const box = {
+      left: current.liftBox.left + target.x,
+      top: current.liftBox.top + target.y,
+      width: current.liftBox.width,
+      height: current.liftBox.height,
+    };
+    const margin = settings.autoScrollEdge;
+    const scroller = current.destination?.container.scroller;
+    const into = (frame: Box) => ({
+      x: Math.min(0, box.left - margin - frame.left) + Math.max(0, box.left + box.width + margin - frame.left - frame.width),
+      y: Math.min(0, box.top - margin - frame.top) + Math.max(0, box.top + box.height + margin - frame.top - frame.height),
+    });
+    if (scroller?.element) {
+      const by = into(scroller.box);
+      if (by.x || by.y) scroller.element.scrollBy(by.x, by.y);
+    }
+    const page = into({ left: 0, top: 0, width: view.innerWidth, height: view.innerHeight });
+    if (page.x || page.y) view.scrollBy(page.x, page.y);
+    placePreview(current, true);
   }
 
   /** The lifted item's index in a container, with Pangea's hysteresis. */
@@ -802,10 +1012,21 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   }
 
   function finish(current: Session, result: SortableResult): void {
+    const at = announcement(current);
     try {
       options.onDragEnd?.(result);
     } finally {
       cleanup(current);
+    }
+    if (at) announce(result.reason === 'DROP' && result.destination ? messages.dropped(at) : messages.returned(at));
+    // A keyboard drag keeps the focus on the moved item, wherever it was drawn again.
+    if (current.mode === 'SNAP') {
+      for (const registration of items.values()) {
+        if (registration.id === current.item.id && registration.element.isConnected) {
+          registration.handle.focus({ preventScroll: true });
+          break;
+        }
+      }
     }
   }
 
@@ -858,7 +1079,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       draggableId: current.item.id,
       type: current.item.type,
       source: { droppableId: current.home.registration.id, index: current.sourceIndex },
-      mode: 'FLUID',
+      mode: current.mode,
     };
   }
 
@@ -886,12 +1107,53 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       clearPending();
       if (session) cleanup(session);
       document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onHandleKeyDown);
+      instructions?.remove();
+      liveRegion?.remove();
       listening = false;
       containers.clear();
       items.clear();
       handles.clear();
     },
   };
+}
+
+let instanceCount = 0;
+
+const arrows = {
+  ArrowUp: { x: 0, y: -1 },
+  ArrowDown: { x: 0, y: 1 },
+  ArrowLeft: { x: -1, y: 0 },
+  ArrowRight: { x: 1, y: 0 },
+} as const;
+
+function centreOf(box: Box): { x: number; y: number } {
+  return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+}
+
+/** Text only a screen reader reads. */
+function hiddenText(document: Document, id: string): HTMLElement {
+  const element = document.createElement('div');
+  element.id = id;
+  Object.assign(element.style, {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    margin: '-1px',
+    padding: '0',
+    overflow: 'hidden',
+    clip: 'rect(0 0 0 0)',
+    whiteSpace: 'nowrap',
+    border: '0',
+  });
+  document.body.append(element);
+  return element;
+}
+
+function labelOf(element: HTMLElement, handle: HTMLElement): string {
+  const named = element.getAttribute('aria-label') ?? handle.getAttribute('aria-label');
+  const text = named ?? element.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  return text.length > 60 ? `${text.slice(0, 59)}…` : text || 'Item';
 }
 
 function measure(element: HTMLElement): Box {
