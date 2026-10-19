@@ -65,7 +65,9 @@
     "lint": "astro sync --root docs && eslint .",
     "test": "vitest run",
     "test:browser": "playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "release": "node scripts/release.mjs",
+    "release:check": "pnpm typecheck && pnpm lint"
   },
   "devDependencies": {
     "@astrojs/starlight": "^0.38.4",
