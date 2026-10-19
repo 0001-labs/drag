@@ -8,5 +8,7 @@
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash"
   },
-  "routes": [{ "pattern": "drag.0001.dev", "custom_domain": true }]
+  "routes": [{ "pattern": "drag.0001.dev", "custom_domain": true }],
+  // A second address while drag.0001.dev still carries the old Pages record.
+  "workers_dev": true
 }
