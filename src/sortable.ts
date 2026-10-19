@@ -53,7 +53,8 @@ export type SortableItemArgs = {
   type?: string;
   /** Where the item is held; the item itself when left out. */
   handle?: HTMLElement | null;
-  canDrag?: () => boolean;
+  /** Whether the item may lift now, and by what: 'mouse', 'pen', 'touch' or 'keyboard'. */
+  canDrag?: (by: { input: string }) => boolean;
   /** Let a press on a button, field or link inside the handle start a drag. */
   allowInteractive?: boolean;
   /** The item's name in announcements; its aria-label or text when left out. */
@@ -160,7 +161,7 @@ type ContainerRegistration = Required<Omit<SortableContainerArgs, 'isDropDisable
 
 type ItemRegistration = Required<Omit<SortableItemArgs, 'handle' | 'canDrag' | 'label'>> & {
   handle: HTMLElement;
-  canDrag: () => boolean;
+  canDrag: (by: { input: string }) => boolean;
   label: () => string;
 };
 
@@ -347,7 +348,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (destroyed || session || pending || event.key !== ' ' || event.defaultPrevented) return;
     if (event.target instanceof Element && event.target.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
     const registration = event.target instanceof HTMLElement ? handles.get(event.target) : undefined;
-    if (!registration || !registration.canDrag()) return;
+    if (!registration || !registration.canDrag({ input: 'keyboard' })) return;
     event.preventDefault();
     event.stopPropagation();
     addWindowListeners();
@@ -373,7 +374,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (destroyed || session || pending) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const registration = findHandle(event.target);
-    if (!registration || !registration.canDrag()) return;
+    if (!registration || !registration.canDrag({ input: event.pointerType || 'mouse' })) return;
 
     pending = {
       item: registration,

@@ -87,7 +87,7 @@ export type UseSortableItemOptions = {
   type?: string;
   /** A selector for the handle inside the item; the item itself when left out. */
   handle?: string;
-  canDrag?: () => boolean;
+  canDrag?: (by: { input: string }) => boolean;
   allowInteractive?: boolean;
   label?: string;
 };
@@ -108,7 +108,7 @@ export function useSortableItem<T extends HTMLElement>(id: string, options: UseS
         handle: held,
         ...(type === undefined ? {} : { type }),
         ...(allowInteractive === undefined ? {} : { allowInteractive }),
-        canDrag: () => latest.current.canDrag?.() ?? true,
+        canDrag: (by) => latest.current.canDrag?.(by) ?? true,
         ...(latest.current.label === undefined ? {} : { label: latest.current.label }),
       });
     },
