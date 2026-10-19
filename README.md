@@ -81,6 +81,8 @@ sortable.container({ element: list, id: 'today', type: 'task' });
 sortable.item({ element: row, id: 'task-1', type: 'task' });
 ```
 
+`canDrag({ input, target })` says whether an item may lift now, by `'mouse'`, `'pen'`, `'touch'` or `'keyboard'`, and from the element pressed. An item that is writing, a block an editor draws, takes `text: { hold: () => 400 }`: it keeps its caret, selection, cursor and keys, a mouse or pen lifts it only after a press held still that long (a press that moves sooner selects words), and the keyboard never lifts it. A hold of nought lifts it as soon as the press moves, as Aa does for blocks already selected.
+
 ## Site
 
 https://drag.0001.dev holds the docs (Astro/Starlight) and the playground at `/playground/`: an Ezo board on Drag and on @hello-pangea/dnd, switched in place, each drag measured. A Cloudflare Worker serves both from `docs-dist` (`pnpm run deploy`).
