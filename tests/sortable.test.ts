@@ -176,6 +176,67 @@ describe('createSortable', () => {
     expect(sortable.isDragging()).toBe(false);
   });
 
+  describe('when the items are writing', () => {
+    function writing(layout: Layout, hold: () => number, seen?: Array<{ input: string; target: Element | null }>): void {
+      sortable.container({ element: layout.list, id: 'a', type: 'cell' });
+      layout.cells.forEach((cell, index) => {
+        cell.contentEditable = 'true';
+        sortable.item({ element: cell, id: `a${index}`, type: 'cell', text: { hold }, canDrag: (by) => { seen?.push(by); return true } });
+      });
+    }
+
+    it('lifts only after a press held still, and leaves a moving press to select words', () => {
+      const a = column('a', 0, 3);
+      writing(a, () => 400);
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 10, 30);
+      vi.advanceTimersByTime(500);
+      expect(sortable.isDragging()).toBe(false);
+      pointer('pointerup', window, 10, 30);
+
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 11, 12);
+      vi.advanceTimersByTime(399);
+      expect(sortable.isDragging()).toBe(false);
+      vi.advanceTimersByTime(1);
+      expect(sortable.isDragging()).toBe(true);
+      pointer('pointermove', window, 11, 52);
+      pointer('pointerup', window, 11, 52);
+      vi.runAllTimers();
+      expect(ended[0]).toEqual(expect.objectContaining({ reason: 'DROP', source: { droppableId: 'a', index: 0 }, destination: { droppableId: 'a', index: 2 } }));
+    });
+
+    it('lifts at once on a move when its hold is nought', () => {
+      const a = column('a', 0, 3);
+      writing(a, () => 0);
+      pointer('pointerdown', a.cells[1], 10, 30);
+      pointer('pointermove', window, 10, 36);
+      expect(sortable.isDragging()).toBe(true);
+    });
+
+    it('keeps its caret, cursor and keys: no grab, no tab stop, no instructions, no space to lift', () => {
+      const a = column('a', 0, 2);
+      writing(a, () => 400);
+      const cell = a.cells[0];
+      expect(cell.getAttribute('data-drag-handle')).toBe('text');
+      expect(cell.hasAttribute('aria-describedby')).toBe(false);
+      expect(cell.getAttribute('tabindex')).toBeNull();
+      cell.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+      expect(sortable.isDragging()).toBe(false);
+      expect(document.querySelector('style[data-0001-drag-sortable-style]')?.textContent).toContain(':not([data-drag-handle="text"])');
+    });
+
+    it('tells canDrag what was pressed', () => {
+      const a = column('a', 0, 2);
+      const seen: Array<{ input: string; target: Element | null }> = [];
+      writing(a, () => 400, seen);
+      const word = document.createElement('span');
+      a.cells[1].append(word);
+      pointer('pointerdown', word, 10, 30);
+      expect(seen.at(-1)).toEqual({ input: 'mouse', target: word });
+    });
+  });
+
   it('lets the product take an item dropped outside every list, where it lies', () => {
     sortable.destroy();
     const taken: Array<{ x: number; y: number }> = [];

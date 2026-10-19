@@ -53,12 +53,24 @@ export type SortableItemArgs = {
   type?: string;
   /** Where the item is held; the item itself when left out. */
   handle?: HTMLElement | null;
-  /** Whether the item may lift now, and by what: 'mouse', 'pen', 'touch' or 'keyboard'. */
-  canDrag?: (by: { input: string }) => boolean;
+  /**
+   * Whether the item may lift now, by what ('mouse', 'pen', 'touch' or
+   * 'keyboard'), and from where: the element pressed, or the focused handle.
+   */
+  canDrag?: (by: { input: string; target: Element | null }) => boolean;
   /** Let a press on a button, field or link inside the handle start a drag. */
   allowInteractive?: boolean;
   /** The item's name in announcements; its aria-label or text when left out. */
   label?: string;
+  /**
+   * The item is writing, a block an editor draws: its handle keeps the
+   * page's caret, selection, cursor and keys. A mouse or pen lifts it only
+   * after a press held still for `hold()` milliseconds, asked at each press;
+   * a press that moves sooner is the page's, and selects words. A hold of 0
+   * lifts it as soon as the press moves, as any item. The keyboard never
+   * lifts it, and it gets no tab stop or instructions of its own.
+   */
+  text?: { hold: () => number };
 };
 
 /** What an announcement is about. Positions count from one. */
@@ -152,7 +164,7 @@ const inheritedText = ['color', 'font', 'letter-spacing', 'line-height', '-webki
 const interactive = 'input, textarea, select, option, button, a[href], [contenteditable]:not([contenteditable="false"])';
 const handleStyleId = 'data-0001-drag-sortable-style';
 const handleStyles = `
-[data-drag-handle]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;cursor:grab;touch-action:manipulation}
+[data-drag-handle]:not([data-drag-handle="text"]){-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;cursor:grab;touch-action:manipulation}
 :root[data-drag-active],:root[data-drag-active] *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important}
 `;
 
@@ -161,9 +173,10 @@ type ContainerRegistration = Required<Omit<SortableContainerArgs, 'isDropDisable
   label: () => string;
 };
 
-type ItemRegistration = Required<Omit<SortableItemArgs, 'handle' | 'canDrag' | 'label'>> & {
+type ItemRegistration = Required<Omit<SortableItemArgs, 'handle' | 'canDrag' | 'label' | 'text'>> & {
   handle: HTMLElement;
-  canDrag: (by: { input: string }) => boolean;
+  canDrag: (by: { input: string; target: Element | null }) => boolean;
+  text: SortableItemArgs['text'];
   label: () => string;
 };
 
@@ -207,6 +220,8 @@ type Pending = {
   startX: number;
   startY: number;
   timer: ReturnType<typeof setTimeout> | null;
+  /** Waiting for a still press to lift writing; a move first leaves the press to the page. */
+  held: boolean;
 };
 
 type Session = {
@@ -282,16 +297,18 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       canDrag: args.canDrag ?? (() => true),
       allowInteractive: args.allowInteractive ?? false,
       label: () => args.label ?? labelOf(args.element, handle),
+      text: args.text,
     };
     items.set(args.element, registration);
     handles.set(handle, registration);
-    handle.setAttribute('data-drag-handle', '');
+    // Writing keeps its own caret, cursor and keys: no grab, no tab stop, no instructions.
+    handle.setAttribute('data-drag-handle', args.text ? 'text' : '');
     // The keyboard reaches the handle, and a screen reader says how to lift it.
-    const addedTabIndex = !handle.hasAttribute('tabindex') && !handle.matches(interactive);
+    const addedTabIndex = !args.text && !handle.hasAttribute('tabindex') && !handle.matches(interactive);
     if (addedTabIndex) handle.tabIndex = 0;
     const describedBy = handle.getAttribute('aria-describedby');
     installDocument(handle.ownerDocument);
-    if (instructions) {
+    if (instructions && !args.text) {
       handle.setAttribute('aria-describedby', [describedBy, instructions.id].filter(Boolean).join(' '));
     }
     return once(() => {
@@ -300,6 +317,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         handles.delete(handle);
         handle.removeAttribute('data-drag-handle');
         if (addedTabIndex) handle.removeAttribute('tabindex');
+        if (args.text) return;
         if (describedBy) handle.setAttribute('aria-describedby', describedBy);
         else handle.removeAttribute('aria-describedby');
       }
@@ -350,7 +368,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (destroyed || session || pending || event.key !== ' ' || event.defaultPrevented) return;
     if (event.target instanceof Element && event.target.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return;
     const registration = event.target instanceof HTMLElement ? handles.get(event.target) : undefined;
-    if (!registration || !registration.canDrag({ input: 'keyboard' })) return;
+    if (!registration || registration.text || !registration.canDrag({ input: 'keyboard', target: registration.handle })) return;
     event.preventDefault();
     event.stopPropagation();
     addWindowListeners();
@@ -376,8 +394,11 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (destroyed || session || pending) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const registration = findHandle(event.target);
-    if (!registration || !registration.canDrag({ input: event.pointerType || 'mouse' })) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (!registration || !registration.canDrag({ input: event.pointerType || 'mouse', target })) return;
 
+    // Writing lifts after a still press, so a press that moves sooner still selects words.
+    const hold = event.pointerType !== 'touch' && registration.text ? Math.max(0, registration.text.hold()) : 0;
     pending = {
       item: registration,
       pointerId: event.pointerId,
@@ -385,11 +406,12 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       startX: pointOf(event).x,
       startY: pointOf(event).y,
       timer: null,
+      held: hold > 0,
     };
-    if (event.pointerType === 'touch') {
+    if (event.pointerType === 'touch' || hold > 0) {
       pending.timer = setTimeout(() => {
         if (pending) lift(pending.item, pending.pointerId, pending.startX, pending.startY);
-      }, settings.touchHold);
+      }, hold || settings.touchHold);
     }
     addWindowListeners();
   }
@@ -399,8 +421,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       const point = pointOf(event);
       const distance = Math.hypot(point.x - pending.startX, point.y - pending.startY);
       if (distance < settings.dragDistance) return;
-      if (pending.pointerType === 'touch') {
-        // The finger moved before the hold finished: it scrolls.
+      if (pending.pointerType === 'touch' || pending.held) {
+        // It moved before the hold finished: a finger scrolls, a press on writing selects words.
         clearPending();
         return;
       }
