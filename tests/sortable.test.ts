@@ -206,6 +206,34 @@ describe('createSortable', () => {
       expect(ended[0]).toEqual(expect.objectContaining({ reason: 'DROP', source: { droppableId: 'a', index: 0 }, destination: { droppableId: 'a', index: 2 } }));
     });
 
+    it('lifts at once on a move along its axis, and leaves a move any other way to select words', () => {
+      const a = column('a', 0, 3);
+      sortable.container({ element: a.list, id: 'a', type: 'cell' });
+      a.cells.forEach((cell, index) => {
+        cell.contentEditable = 'true';
+        sortable.item({ element: cell, id: `a${index}`, type: 'cell', text: { hold: () => 400, axis: 'y' } });
+      });
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 20, 11);
+      expect(sortable.isDragging()).toBe(false);
+      vi.advanceTimersByTime(500);
+      expect(sortable.isDragging()).toBe(false);
+      pointer('pointerup', window, 20, 11);
+
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 14, 14);
+      expect(sortable.isDragging()).toBe(false);
+      pointer('pointerup', window, 14, 14);
+
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 11, 16);
+      expect(sortable.isDragging()).toBe(true);
+      pointer('pointermove', window, 11, 52);
+      pointer('pointerup', window, 11, 52);
+      vi.runAllTimers();
+      expect(ended[0]).toEqual(expect.objectContaining({ reason: 'DROP', source: { droppableId: 'a', index: 0 }, destination: { droppableId: 'a', index: 2 } }));
+    });
+
     it('lifts at once on a move when its hold is nought', () => {
       const a = column('a', 0, 3);
       writing(a, () => 0);
