@@ -57,6 +57,11 @@
       "import": "./dist/sortable.js",
       "require": "./dist/sortable.cjs"
     },
+    "./grid": {
+      "types": "./dist/grid.d.ts",
+      "import": "./dist/grid.js",
+      "require": "./dist/grid.cjs"
+    },
     "./react": {
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js",

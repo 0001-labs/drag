@@ -85,6 +85,36 @@ A list with `isCombineEnabled` lets an item held over the middle of another comb
 
 `canDrag({ input, target })` says whether an item may lift now, by `'mouse'`, `'pen'`, `'touch'` or `'keyboard'`, and from the element pressed. An item that is writing, a block an editor draws, takes `text: { hold: () => 400 }`: it keeps its caret, selection, cursor and keys, a mouse or pen lifts it only after a press held still that long (a press that moves sooner selects words), and the keyboard never lifts it. A hold of nought lifts it as soon as the press moves, as Aa does for blocks already selected.
 
+## Things on squares
+
+`@0001-labs/drag/grid` carries things on a surface ruled in squares, a whole square at a time, as a diagram's boxes are moved, sized and joined on a board. Nothing is cloned and nothing moves by itself: each press asks the page what it carries, and the page draws and writes what the gesture means.
+
+```ts
+import { createGrid } from '@0001-labs/drag/grid';
+
+const grid = createGrid();
+grid.surface({
+  element: board,
+  unit: () => 20,
+  press: ({ square }) => {
+    const box = boxAt(square);
+    if (!box) return null; // the press is the page's
+    return {
+      onMove: ({ moved }) => drawAt(box, box.x + moved.x, box.y + moved.y),
+      onDrop: ({ moved }) => save(box, box.x + moved.x, box.y + moved.y),
+      onCancel: () => drawAt(box, box.x, box.y),
+      onClick: () => choose(box),
+    };
+  },
+});
+// A tool in a bar carried onto the board, measured on the board's squares.
+grid.source({ element: boxTool, surface: board, press: () => ({ onDrop: ({ inside, square }) => inside && add(square) }) });
+// The keyboard carries a gesture too: arrows a square, Shift-arrows four, Tab to the next target, Enter to let go.
+grid.keyboard({ surface: board, from: { x: 2.5, y: 0.5 }, gesture: { targets: () => middles, onDrop: join, announce: say } });
+```
+
+A gesture hears `origin`, `point` (squares, fractions included), `square` (the one under the pointer), `moved` (whole squares from the press), `inside` and `target` (the element under the pointer, through shadow roots). A mouse or pen lifts after five pixels, a finger after a still hold of 250ms (a finger that moves sooner scrolls the page), and near an edge the surface and the page scroll under the pointer. Escape takes it back.
+
 ## Site
 
 https://drag.0001.dev holds the docs (Astro/Starlight) and the playground at `/playground/`: an Ezo board on Drag and on @hello-pangea/dnd, switched in place, each drag measured. A Cloudflare Worker serves both from `docs-dist` (`pnpm run deploy`).
