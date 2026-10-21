@@ -10,6 +10,7 @@ export default defineConfig({
   vite: { server: { fs: { allow: ['..'] } } },
   integrations: [starlight({
     title: 'Drag',
+    pagefind: false,
     favicon: '/icons/handle.svg',
     description: 'Drag and drop for lists, boards and grids. TypeScript, React and Web Components.',
     expressiveCode: {

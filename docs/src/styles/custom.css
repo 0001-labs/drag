@@ -9,7 +9,7 @@
 
   --sl-content-width: calc(36 * var(--grid));
   --sl-sidebar-width: calc(8 * var(--grid));
-  --sl-nav-height: calc(3 * var(--grid));
+  --sl-nav-height: calc(2 * var(--grid));
   --sl-text-code: calc(13px * var(--sf, 1));
   --sl-line-height: 1.4286;
   --sl-font: var(--ds-typeface-regular);
@@ -52,7 +52,7 @@ body {
 @media (max-width: 50rem) { .content-panel { padding-inline: var(--grid); } }
 
 /* Design system 1's root sheet has a .header of its own, a square item; Starlight's header is the page's width. */
-header.header { box-sizing: border-box; display: block; width: 100%; height: calc(3 * var(--grid)); border-bottom: 0; box-shadow: inset 0 -1px var(--ds1-docs-divider); padding: 0 var(--grid); }
+header.header { box-sizing: border-box; display: block; width: 100%; height: calc(2 * var(--grid)); border-bottom: 0; box-shadow: inset 0 -1px var(--ds1-docs-divider); padding: 0 var(--grid); }
 .sidebar-pane { border-inline-end: 0; box-shadow: inset -1px 0 var(--ds1-docs-divider); }
 .sidebar-content { padding: 0; height: 100%; }
 .sidebar-pane .sl-scroll, .sidebar-pane > .sidebar-content { height: 100%; }
@@ -121,4 +121,3 @@ h1#_top {
 [data-drag-preview] { font-family: var(--ds-typeface-regular); background: var(--background); list-style: none; }
 .grid-demo { position: relative; width: 100%; height: calc(10 * var(--grid)); overflow: hidden; background-image: linear-gradient(var(--ds1-docs-divider) 1px, transparent 1px), linear-gradient(90deg, var(--ds1-docs-divider) 1px, transparent 1px); background-size: var(--grid) var(--grid); }
 .grid-box { position: absolute; inset: 0 auto auto 0; width: calc(4 * var(--grid)); height: calc(2 * var(--grid)); display: grid; place-items: center; background: var(--ds-fill); border: 1px solid var(--ds-text-color-muted); border-radius: calc(4px * var(--sf, 1)); cursor: grab; }
-.docs-version { font-size: calc(10px * var(--sf, 1)); color: var(--ds-text-color-muted); }

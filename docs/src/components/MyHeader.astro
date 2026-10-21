@@ -1,19 +1,7 @@
----
-import Search from '@astrojs/starlight/components/Search.astro';
----
 <header class="docs-header">
   <a class="docs-brand" href="/">Drag</a>
-  <Search />
-  <nav aria-label="Elsewhere">
-    <a href="/playground/">Playground</a>
-    <a href="https://github.com/0001-labs/Drag">GitHub</a>
-  </nav>
 </header>
 <style>
-.docs-header { display: flex; align-items: center; gap: var(--grid); height: 100%; min-width: 0; }
-.docs-brand { color: var(--ds-text-color); font-family: var(--ds-typeface-medium); text-decoration: none; }
-nav { display: flex; gap: var(--grid); margin-inline-start: auto; }
-nav a { color: var(--ds-text-color-muted); text-decoration: none; }
-:global(site-search) { min-width: 0; }
-@media (max-width: 50rem) { nav { display: none; } }
+.docs-header { display: flex; align-items: center; height: 100%; min-width: 0; }
+.docs-brand { display: inline-flex; align-items: center; height: var(--grid); color: var(--ds-text-color); text-decoration: none; }
 </style>
