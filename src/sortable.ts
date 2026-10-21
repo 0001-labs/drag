@@ -6,7 +6,7 @@
  * © 2021 Gabriel Santerre; see NOTICE): siblings move out of the way by the
  * lifted item's whole size, a sibling moves once the lifted item's edge passes
  * its centre, counting the room it has already given, and the timings and
- * curves are Pangea's. The engine around it is new and has no framework: the
+ * curves are carried over too. The engine around it is new and has no framework: the
  * lifted item is a clone in an overlay moved by writing its transform in the
  * pointer handler, siblings move by the `translate` property alone, geometry is
  * measured once at lift, and nothing changes layout while the pointer moves.
@@ -53,8 +53,8 @@ export type SortableContainerArgs = {
   isDropDisabled?: () => boolean;
   /**
    * Whether an item held over the middle of another here combines with it
-   * (as a list dropped onto a list makes a folder), Pangea's rule: the
-   * leading edge inside the middle half of the other item.
+   * (as a list dropped onto a list makes a folder): the leading edge inside
+   * the middle half of the other item.
    */
   isCombineEnabled?: () => boolean;
   /** The list's name in announcements; its aria-label or id when left out. */
@@ -196,7 +196,7 @@ const defaults = {
   autoScrollEdge: 60,
 } as const;
 
-/** Pangea's drop: the longest duration is reached at this distance. */
+/** The drop: the longest duration is reached at this distance. */
 const maxDropDistance = 1500;
 const maxScrollSpeed = 24;
 const inheritedText = ['color', 'font', 'letter-spacing', 'line-height', '-webkit-font-smoothing'];
@@ -950,7 +950,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   }
 
   /**
-   * The sibling the lifted item is held over, by Pangea's rule: before the
+   * The sibling the lifted item is held over: before the
    * gap, the leading edge inside its middle half; after the gap, the
    * trailing edge inside the middle half of where it has moved to.
    */
@@ -978,7 +978,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     return true;
   }
 
-  /** The lifted item's index in a container, with Pangea's hysteresis. */
+  /** The lifted item's index in a container, with hysteresis so it does not flicker. */
   function indexIn(current: Session, snapshot: ContainerSnapshot): number {
     const vertical = snapshot.registration.axis === 'vertical';
     const offset = offsetOf(current, snapshot);
@@ -1115,7 +1115,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (current.scrollFrame !== null) cancelAnimationFrame(current.scrollFrame);
     if (current.impactFrame !== null) cancelAnimationFrame(current.impactFrame);
 
-    // Dropped onto another item: it shrinks into it and fades, as Pangea's does.
+    // Dropped onto another item: it shrinks into it and fades.
     if (reason === 'DROP' && current.combine) {
       const { container, slot } = current.combine;
       const result: SortableResult = { ...startOf(current), destination: null, combine: combineOf(current), reason };

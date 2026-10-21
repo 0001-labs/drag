@@ -71,7 +71,7 @@ import '@0001-labs/drag/elements';
 
 ## Sortable lists
 
-`@0001-labs/drag/sortable` lifts an item by a pointer, a finger hold or a pen and moves it through lists of the same type. Siblings move out of the way by the lifted item's whole size, as @hello-pangea/dnd does (see `NOTICE`), while the lifted item moves in an overlay by its transform alone.
+`@0001-labs/drag/sortable` lifts an item by a pointer, a finger hold or a pen and moves it through lists of the same type. Siblings move out of the way by the lifted item's whole size (see `NOTICE` for the motion's origin), while the lifted item moves in an overlay by its transform alone.
 
 ```ts
 import { createSortable } from '@0001-labs/drag/sortable';

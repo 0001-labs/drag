@@ -21,6 +21,6 @@ The engine is written in TypeScript and works without a framework. Your app owns
 
 ## Open source
 
-Drag is [MIT licensed](https://github.com/0001-labs/Drag/blob/main/LICENSE). The sortable motion carries over behavior from @hello-pangea/dnd; its attribution is in [NOTICE](https://github.com/0001-labs/Drag/blob/main/NOTICE). React is optional. The framework-neutral entry points do not need it.
+Drag is [MIT licensed](https://github.com/0001-labs/Drag/blob/main/LICENSE). Third-party attributions are in [NOTICE](https://github.com/0001-labs/Drag/blob/main/NOTICE). React is optional. The framework-neutral entry points do not need it.
 
 These guides follow the current source. See [installation and versions](/start-here/install/#versions) before choosing between the published alpha and a source build.
