@@ -59,6 +59,17 @@ export type SortableContainerArgs = {
   isCombineEnabled?: () => boolean;
   /** The list's name in announcements; its aria-label or id when left out. */
   label?: string;
+  /**
+   * Its items hold still while something is carried over them: nothing makes
+   * room, the keyboard steps the lifted item from item to item, and a drop
+   * lands at once. For a page that draws where the item will land itself, as
+   * a board of squares does.
+   */
+  still?: boolean;
+  /** Keep an item lifted from here on one line; the engine's `lockAxis` when left out. */
+  lockAxis?: 'x' | 'y';
+  /** The element drawn under the pointer for an item lifted from here; the engine's `renderPreview`, then a clone, when it gives none. */
+  renderPreview?: (source: HTMLElement) => HTMLElement | null | undefined;
 };
 
 export type SortableItemArgs = {
@@ -196,10 +207,12 @@ const handleStyles = `
 :root[data-drag-active],:root[data-drag-active] *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important}
 `;
 
-type ContainerRegistration = Required<Omit<SortableContainerArgs, 'isDropDisabled' | 'isCombineEnabled' | 'label'>> & {
+type ContainerRegistration = Required<Omit<SortableContainerArgs, 'isDropDisabled' | 'isCombineEnabled' | 'label' | 'lockAxis' | 'renderPreview'>> & {
   isDropDisabled: () => boolean;
   isCombineEnabled: () => boolean;
   label: () => string;
+  lockAxis: SortableContainerArgs['lockAxis'];
+  renderPreview: SortableContainerArgs['renderPreview'];
 };
 
 type ItemRegistration = Required<Omit<SortableItemArgs, 'handle' | 'canDrag' | 'label' | 'text'>> & {
@@ -280,6 +293,8 @@ type Session = {
   dropping: boolean;
   /** The sibling the lifted item is held over, to combine with; the gap stays as it was. */
   combine: { container: ContainerSnapshot; slot: Slot } | null;
+  /** The line the lifted item keeps to, if any. */
+  lockAxis: 'x' | 'y' | undefined;
 };
 
 export function createSortable(options: SortableOptions = {}): SortableController {
@@ -312,6 +327,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       isDropDisabled: args.isDropDisabled ?? (() => false),
       isCombineEnabled: args.isCombineEnabled ?? (() => false),
       label: () => args.label ?? args.element.getAttribute('aria-label') ?? args.id,
+      still: args.still ?? false,
+      lockAxis: args.lockAxis,
+      renderPreview: args.renderPreview,
     };
     containers.set(args.element, registration);
     return once(() => {
@@ -650,8 +668,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         paddingStart: parsePixels(vertical ? style.paddingTop : style.paddingLeft) * scale,
         scroller,
         slots,
-        // The lifted item's margin box and the list's gap: the room siblings give.
-        room: (vertical ? liftBox.height + margins.vertical * itemScale : liftBox.width + margins.horizontal * itemScale) + gap,
+        // The lifted item's margin box and the list's gap: the room siblings give, none where they hold still.
+        room: candidate.still ? 0 : (vertical ? liftBox.height + margins.vertical * itemScale : liftBox.width + margins.horizontal * itemScale) + gap,
         marginStart: (vertical ? margins.top : margins.left) * itemScale,
         isHome,
       });
@@ -676,7 +694,10 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       overlay.style.setProperty(property, sourceStyle.getPropertyValue(property));
     }
 
-    const preview = options.renderPreview?.(registration.element) ?? cloneForPreview(registration.element);
+    const preview =
+      home.registration.renderPreview?.(registration.element) ??
+      options.renderPreview?.(registration.element) ??
+      cloneForPreview(registration.element);
     for (const property of inheritedText) {
       preview.style.setProperty(property, sourceStyle.getPropertyValue(property));
     }
@@ -728,6 +749,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       impactFrame: null,
       dropping: false,
       combine: null,
+      lockAxis: home.registration.lockAxis ?? options.lockAxis,
     };
 
     element.style.visibility = 'hidden';
@@ -745,8 +767,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (!current) return;
     current.lastX = clientX;
     current.lastY = clientY;
-    const x = options.lockAxis === 'y' ? 0 : clientX - current.startX;
-    const y = options.lockAxis === 'x' ? 0 : clientY - current.startY;
+    const x = current.lockAxis === 'y' ? 0 : clientX - current.startX;
+    const y = current.lockAxis === 'x' ? 0 : clientY - current.startY;
     current.preview.style.transform = previewTransform(x, y, current.previewScale);
     updateImpact(current);
     scheduleAutoScroll(current);
@@ -922,8 +944,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const size = vertical ? current.liftBox.height : current.liftBox.width;
     const moved =
       vertical
-        ? options.lockAxis === 'x' ? 0 : current.lastY - current.startY
-        : options.lockAxis === 'y' ? 0 : current.lastX - current.startX;
+        ? current.lockAxis === 'x' ? 0 : current.lastY - current.startY
+        : current.lockAxis === 'y' ? 0 : current.lastX - current.startX;
     return { start: liftStart + moved, end: liftStart + moved + size };
   }
 
@@ -1005,7 +1027,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (current.reserved !== foreign) {
       current.reserved?.registration.element.style.removeProperty('--drag-reserve');
       current.reserved?.registration.element.removeAttribute('data-drag-over');
-      if (foreign) {
+      if (foreign && !foreign.registration.still) {
         foreign.registration.element.style.setProperty('--drag-reserve', `${foreign.room}px`);
       }
       current.reserved = foreign;
@@ -1140,7 +1162,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const from = parseTranslate(current.preview.style.transform);
     const distance = Math.hypot(target.x - from.x, target.y - from.y);
     const { minDuration, maxDuration, easing } = settings.drop;
-    const duration = distance < 0.5 || reducedMotion ? 0 : minDuration + (maxDuration - minDuration) * Math.min(distance / maxDropDistance, 1);
+    // Among items that hold still the page draws where it lands: the drop is there at once.
+    const lands = !returning && !!current.destination?.container.registration.still;
+    const duration = distance < 0.5 || reducedMotion || lands ? 0 : minDuration + (maxDuration - minDuration) * Math.min(distance / maxDropDistance, 1);
 
     const result: SortableResult = {
       ...startOf(current),
@@ -1173,9 +1197,18 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const offset = offsetOf(current, snapshot);
     const slots = snapshot.slots;
     let start: number;
+    // Where items hold still, the lifted one stands over the item at its index, as it was before the lift.
+    const still = snapshot.registration.still;
+    const over = still ? stillSlot(snapshot, destination.index) : undefined;
 
     if (snapshot.isHome && destination.index === current.sourceIndex) {
       start = vertical ? current.liftBox.top : current.liftBox.left;
+    } else if (over) {
+      start = vertical ? over.box.top : over.box.left;
+    } else if (still && slots.length > 0) {
+      // Past the last item: just beyond it, after the gap.
+      const last = slots[slots.length - 1];
+      start = (vertical ? last.box.top + last.box.height : last.box.left + last.box.width) + snapshot.gap;
     } else if (destination.index < slots.length) {
       start = baselineStart(current, snapshot, slots[destination.index]);
     } else if (slots.length > 0) {
@@ -1202,6 +1235,12 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       x: (vertical ? crossNow : startNow) - current.liftBox.left,
       y: (vertical ? startNow : crossNow) - current.liftBox.top,
     };
+  }
+
+  /** The item at an index among items that hold still, counted as they stood with the lifted one among them. */
+  function stillSlot(snapshot: ContainerSnapshot, index: number): Slot | undefined {
+    if (!snapshot.isHome) return snapshot.slots[index];
+    return snapshot.slots.find((slot) => slot.original === index);
   }
 
   function finish(current: Session, result: SortableResult): void {

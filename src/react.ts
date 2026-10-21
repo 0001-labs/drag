@@ -66,6 +66,10 @@ export type UseSortableContainerOptions = {
   isDropDisabled?: () => boolean;
   isCombineEnabled?: () => boolean;
   label?: string;
+  /** Its items hold still while one is carried over them; see `SortableContainerArgs.still`. */
+  still?: boolean;
+  lockAxis?: 'x' | 'y';
+  renderPreview?: (source: HTMLElement) => HTMLElement | null | undefined;
 };
 
 /** A ref that makes its element a list of sortable items. */
@@ -73,7 +77,7 @@ export function useSortableContainer<T extends HTMLElement>(id: string, options:
   const controller = useSortableController();
   const latest = useRef(options);
   latest.current = options;
-  const { type, axis } = options;
+  const { type, axis, still, lockAxis } = options;
   return useCallback(
     (element: T | null) => {
       if (!element) return undefined;
@@ -82,12 +86,15 @@ export function useSortableContainer<T extends HTMLElement>(id: string, options:
         id,
         ...(type === undefined ? {} : { type }),
         ...(axis === undefined ? {} : { axis }),
+        ...(still === undefined ? {} : { still }),
+        ...(lockAxis === undefined ? {} : { lockAxis }),
         isDropDisabled: () => latest.current.isDropDisabled?.() ?? false,
         isCombineEnabled: () => latest.current.isCombineEnabled?.() ?? false,
+        renderPreview: (source) => latest.current.renderPreview?.(source),
         ...(latest.current.label === undefined ? {} : { label: latest.current.label }),
       });
     },
-    [controller, id, type, axis],
+    [controller, id, type, axis, still, lockAxis],
   );
 }
 

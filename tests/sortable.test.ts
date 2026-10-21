@@ -309,6 +309,57 @@ describe('createSortable', () => {
     expect(document.querySelector<HTMLElement>('[data-drag-preview]')?.style.transform).toBe('translate3d(0px, 30px, 0)');
   });
 
+  describe('a list whose items hold still', () => {
+    const still = (layout: Layout, id: string, extra: Partial<Parameters<SortableController['container']>[0]> = {}) => {
+      sortable.container({ element: layout.list, id, type: 'cell', still: true, ...extra });
+      layout.cells.forEach((cell, index) => sortable.item({ element: cell, id: `${id}${index}`, type: 'cell' }));
+    };
+    const preview = () => document.querySelector<HTMLElement>('[data-drag-preview]');
+
+    it('moves nothing out of the way and lands a drop at once', () => {
+      const a = column('a', 0, 4);
+      const b = column('b', 100, 3);
+      still(a, 'a');
+      still(b, 'b');
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 10, 50);
+      expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 2 });
+      expect(a.cells.map((cell) => cell.style.translate)).toEqual(['', '', '', '']);
+      pointer('pointermove', window, 110, 10);
+      expect(b.cells[0].style.translate).toBe('');
+      expect(b.list.style.getPropertyValue('--drag-reserve')).toBe('');
+      pointer('pointerup', window, 110, 10);
+      // No timers run: the drop is there at once.
+      expect(ended).toEqual([expect.objectContaining({ destination: { droppableId: 'b', index: 0 }, reason: 'DROP' })]);
+      expect(preview()).toBeNull();
+    });
+
+    it('steps the keyboard from item to item, over each as it stood', () => {
+      const a = column('a', 0, 4);
+      still(a, 'a');
+      a.cells[1].dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+      const down = () => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+      down();
+      // Over a2, a square below where a1 was lifted.
+      expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 2 });
+      expect(preview()?.style.transform).toBe('translate3d(0px, 20px, 0)');
+      down();
+      expect(preview()?.style.transform).toBe('translate3d(0px, 40px, 0)');
+      expect(a.cells.map((cell) => cell.style.translate)).toEqual(['', '', '', '']);
+    });
+
+    it('draws the preview its list asks for, kept on the list\'s own line', () => {
+      const a = column('a', 0, 3);
+      const drawn = document.createElement('div');
+      drawn.textContent = 'block';
+      still(a, 'a', { lockAxis: 'x', renderPreview: () => drawn });
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 40, 60);
+      expect(preview()).toBe(drawn);
+      expect(drawn.style.transform).toBe('translate3d(30px, 0px, 0)');
+    });
+  });
+
   describe('combining', () => {
     let combines: Array<{ draggableId: string; droppableId: string } | null>;
 
