@@ -125,7 +125,7 @@ A gesture hears `origin`, `point` (squares, fractions included), `square` (the o
 
 ## Site
 
-https://drag.0001.dev holds the docs (Astro/Starlight), with Play on the front page: an Ezo board on Drag and on @hello-pangea/dnd, switched in place, each drag measured. A Cloudflare Worker serves them from `docs-dist` (`pnpm run deploy`).
+https://drag.0001.dev holds the docs (Astro/Starlight), with Play on the front page: an Ezo board on Drag, each drag measured. A Cloudflare Worker serves them from `docs-dist` (`pnpm run deploy`).
 
 ## Development
 

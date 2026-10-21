@@ -2,11 +2,6 @@ import { Profiler, useState } from 'react';
 import { applyMove, createBoard, type Load, type MoveResult } from './board';
 import { DragBoard } from './drag-board';
 import { countRender, startMeasuring, stopMeasuring, type Reading } from './meter';
-import { PangeaBoard } from './pangea-board';
-
-type Engine = 'drag' | 'pangea';
-
-const engineNames: Record<Engine, string> = { drag: 'Drag', pangea: 'Pangea' };
 
 function fromAddress<T extends string>(name: string, values: readonly T[], fallback: T): T {
   const value = new URLSearchParams(location.search).get(name);
@@ -20,16 +15,10 @@ function toAddress(name: string, value: string): void {
 }
 
 export function App() {
-  const [engine, setEngine] = useState<Engine>(() => fromAddress('engine', ['drag', 'pangea'], 'drag'));
   const [load, setLoad] = useState<Load>(() => fromAddress('cells', ['few', 'many'], 'few'));
   const [board, setBoard] = useState(() => createBoard(load));
-  const [reading, setReading] = useState<{ engine: Engine; reading: Reading } | null>(null);
+  const [reading, setReading] = useState<Reading | null>(null);
 
-  const chooseEngine = (next: Engine) => {
-    setEngine(next);
-    setReading(null);
-    toAddress('engine', next);
-  };
   const chooseLoad = (next: Load) => {
     setLoad(next);
     setBoard(createBoard(next));
@@ -41,21 +30,12 @@ export function App() {
   const onMove = (result: MoveResult) => {
     const measured = stopMeasuring();
     setBoard((current) => applyMove(current, result));
-    if (measured) setReading({ engine, reading: measured });
+    if (measured) setReading(measured);
   };
-
-  const Board = engine === 'drag' ? DragBoard : PangeaBoard;
 
   return (
     <section className="play" aria-label="Play">
       <div className="bar">
-        <div className="ds-tabs" role="group" aria-label="Engine">
-          {(['drag', 'pangea'] as const).map((value) => (
-            <button key={value} type="button" className="ds-button" aria-pressed={engine === value} onClick={() => chooseEngine(value)}>
-              {engineNames[value]}
-            </button>
-          ))}
-        </div>
         <div className="ds-tabs" role="group" aria-label="Cells">
           {(['few', 'many'] as const).map((value) => (
             <button key={value} type="button" className="ds-button" aria-pressed={load === value} onClick={() => chooseLoad(value)}>
@@ -68,22 +48,22 @@ export function App() {
         </button>
       </div>
       <p className="readout" aria-live="polite">
-        {reading ? <ReadingLine engine={reading.engine} reading={reading.reading} /> : 'Move a cell, or a column by its name. On a phone, hold a cell to lift it. Each drag is measured from lift to drop.'}
+        {reading ? <ReadingLine reading={reading} /> : 'Move a cell, or a column by its name. On a phone, hold a cell to lift it. Each drag is measured from lift to drop.'}
       </p>
       <div className="play-board-scroller">
         <Profiler id="board" onRender={countRender}>
-          <Board key={engine} board={board} onStart={onStart} onMove={onMove} />
+          <DragBoard board={board} onStart={onStart} onMove={onMove} />
         </Profiler>
       </div>
     </section>
   );
 }
 
-function ReadingLine({ engine, reading }: { engine: Engine; reading: Reading }) {
+function ReadingLine({ reading }: { reading: Reading }) {
   const renders = reading.renders === 1 ? '1 render' : `${reading.renders} renders`;
   return (
     <>
-      {engineNames[engine]}, last drag: <span className="figure">{reading.frames}</span> frames a second, longest frame{' '}
+      Last drag: <span className="figure">{reading.frames}</span> frames a second, longest frame{' '}
       <span className="figure">{reading.longestFrame}</span> ms, pointer <span className="figure">{reading.pointerRate}</span> a second,{' '}
       <span className="figure">{renders}</span> of React.
     </>

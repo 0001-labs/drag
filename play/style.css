@@ -70,7 +70,7 @@
   margin-top: var(--square);
 }
 
-/* Margins, not gaps, keep the pixel between cells: Pangea measures margins only. */
+/* Margins, not gaps, keep the pixel between cells. */
 .play-column {
   display: flex;
   flex-direction: column;

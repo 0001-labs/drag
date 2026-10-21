@@ -91,7 +91,6 @@
   "devDependencies": {
     "@astrojs/starlight": "^0.38.4",
     "@eslint/js": "^9.0.0",
-    "@hello-pangea/dnd": "^18.0.1",
     "@playwright/test": "^1.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^19.3.0",

@@ -49,7 +49,7 @@ const lists: Array<{ id: string; title: string; columns: Array<[string, string[]
     columns: [
       ['Ideas', ['A paper planner', 'Drag in every list', 'Lists that sort themselves by what is due, and what is waiting on someone', 'Typewriter font']],
       ['Doing', ['# This week', 'Playground', 'Drag engine', 'Port the board', 'Bench page']],
-      ['Done', ['Plan', 'Measure Pangea', 'Release 0.2.0-alpha.0', 'Sync 1 copy']],
+      ['Done', ['Plan', 'Measure a drag', 'Release 0.2.0-alpha.0', 'Sync 1 copy']],
     ],
   },
   {
