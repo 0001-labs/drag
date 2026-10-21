@@ -12,7 +12,11 @@ export function setupDocsInteractions(): void {
       for (const attribute of ['data-status-target', 'data-announcement-target']) {
         const id = list.getAttribute(attribute);
         const status = id ? document.getElementById(id) : null;
-        if (status) status.textContent = `Order: ${detail.values.join(', ')}`;
+        if (status) {
+          status.textContent = attribute === 'data-announcement-target'
+            ? list.querySelector('[data-0001-drag-live-region]')?.textContent ?? ''
+            : `Order: ${detail.values.join(', ')}`;
+        }
       }
     });
   });

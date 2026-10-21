@@ -11,8 +11,8 @@ test('docs homepage loads without console errors', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('link', { name: 'Drag' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Introduction' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Drag primitives for framework-neutral interfaces.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Drag', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choose an API' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Documentation' })).toBeVisible();
   expect(errors).toEqual([]);
 });
