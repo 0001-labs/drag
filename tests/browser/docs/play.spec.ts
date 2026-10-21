@@ -24,8 +24,8 @@ const cellTitles = (page: Page, list: string, name: string) => column(page, list
 for (const engine of engines) {
   test.describe(engine, () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/playground/?engine=${engine}`);
-      await expect(page.getByRole('heading', { name: 'Drag playground' })).toBeVisible();
+      await page.goto(`/?engine=${engine}#play`);
+      await expect(page.getByRole('region', { name: 'Play' })).toBeVisible();
     });
 
     test('draws cells on the square, a pixel apart', async ({ page }) => {

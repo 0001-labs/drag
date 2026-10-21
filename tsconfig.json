@@ -31,10 +31,9 @@
     "tsup.config.ts",
     "vite.config.ts",
     "vitest.config.ts",
-    "playground",
-    "vite.playground.config.ts"
+    "play"
   ],
   "exclude": [
-    "playground/ds1"
+    "play/ds1"
   ]
 }

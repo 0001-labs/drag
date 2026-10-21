@@ -74,12 +74,10 @@
   "scripts": {
     "build": "tsup",
     "dev": "vite --host 127.0.0.1",
-    "playground:dev": "vite --config vite.playground.config.ts",
-    "playground:build": "vite build --config vite.playground.config.ts",
     "docs:build": "astro build --root docs",
     "docs:dev": "astro dev --root docs --host 127.0.0.1 --port 5197",
     "docs:preview": "astro preview --root docs --host 127.0.0.1 --port 5198",
-    "site:build": "ci-time build 'pnpm docs:build && pnpm playground:build'",
+    "site:build": "ci-time build 'pnpm docs:build'",
     "deploy": "ci-time deploy 'sync1 guard && pnpm site:build && wrangler deploy'",
     "lint": "astro sync --root docs && eslint .",
     "test": "vitest run",

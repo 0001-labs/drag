@@ -3,11 +3,13 @@ title: Drag
 description: Drag and drop for lists, boards and grids, with TypeScript, React or HTML.
 ---
 
+import Play from '../../components/Play.astro';
+
 Drag lets people move things in your interface with a mouse, a finger, a pen or the keyboard. Use it to reorder a list, carry an item between columns, or move a box across a grid.
 
 The engine is written in TypeScript and works without a framework. Your app owns the data and commits each change when the person drops it.
 
-[Install Drag](/start-here/install/), [try the sortable demo](/examples/sortable/), or open the [playground](/playground/).
+[Install Drag](/start-here/install/), [try the sortable demo](/examples/sortable/), or try [Play](#play) below.
 
 ## Choose an API
 
@@ -19,18 +21,13 @@ The engine is written in TypeScript and works without a framework. Your app owns
 | A small HTML list | [Web Components](/start-here/web-components/) | Custom elements that reorder their own children. |
 | Native browser drag events | [Element adapter](/api/element-adapter/) | Sources, drop targets and monitors with typed lifecycle events. |
 
-## Try it
+## Play
 
-<div class="docs-demo" data-sortable-demo data-ds-not-prose>
-  <ul class="sortable-demo-list" aria-label="Reading list">
-    <li data-name="Read"><span data-demo-handle role="button" aria-label="Move Read"><span class="ds-icon" style="--ds-icon: url(/icons/handle.svg)" aria-hidden="true"></span></span><span>Read the guide</span></li>
-    <li data-name="Build"><span data-demo-handle role="button" aria-label="Move Build"><span class="ds-icon" style="--ds-icon: url(/icons/handle.svg)" aria-hidden="true"></span></span><span>Build a list</span></li>
-    <li data-name="Ship"><span data-demo-handle role="button" aria-label="Move Ship"><span class="ds-icon" style="--ds-icon: url(/icons/handle.svg)" aria-hidden="true"></span></span><span>Ship it</span></li>
-  </ul>
-  <p class="demo-status" role="status">Order: Read, Build, Ship</p>
-</div>
+An Ezo board, on Drag and on @hello-pangea/dnd: switch between them in place, and each drag is measured from lift to drop. Move a cell, carry it into the other list, or move a column by its name.
 
-Drag a handle, or focus it and press Space to lift, arrows to move, and Space or Enter to drop. Escape cancels. On a touch screen, hold the handle before moving.
+<Play />
+
+Focus a cell and press Space to lift it, the arrows to move it, and Space or Enter to put it down. Escape puts it back. On a touch screen, hold a cell before moving it.
 
 ## Open source
 

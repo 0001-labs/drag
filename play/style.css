@@ -1,27 +1,24 @@
 /*
- * The playground on Design system 1's measures: a square is 20px, a cell is
- * four squares wide and as many high as it has lines, drawn a pixel short,
- * edge to edge as an Ezo list is. Words stand on the lower sixteen of a square.
+ * Play, on the docs' front page, on Design system 1's measures: a square is
+ * 20px, a cell is four squares wide and as many high as it has lines, drawn a
+ * pixel short, edge to edge as an Ezo list is. Words stand on the lower sixteen
+ * of a square. The measures are on the root, as the lifted copy is drawn over
+ * the page, outside Play.
  */
 :root {
-  --sf: 1;
   --square: 20px;
   --cell-fill: light-dark(var(--slate-light), var(--slate-dark));
   --rule: light-dark(var(--slate-light), var(--slate-dark));
 }
 
-body {
-  background: var(--background);
+.play {
+  margin-top: var(--square);
   color: var(--text-color);
   font-family: var(--typeface-regular);
   font-size: var(--type-size-default);
 }
 
-.page {
-  padding: var(--square);
-}
-
-.bar {
+.play .bar {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
@@ -30,19 +27,7 @@ body {
   line-height: 16px;
 }
 
-.bar__title {
-  margin: 0;
-  font-family: var(--typeface-medium);
-  font-size: var(--type-size-default);
-  font-weight: inherit;
-  line-height: 16px;
-}
-
-.bar__docs {
-  margin-left: auto;
-}
-
-.readout {
+.play .readout {
   margin: var(--square) 0 0;
   min-height: var(--square);
   padding-top: 4px;
@@ -51,7 +36,7 @@ body {
   color: var(--ds-text-color-muted);
 }
 
-.figure {
+.play .figure {
   color: var(--text-color);
   font-variant-numeric: tabular-nums;
 }

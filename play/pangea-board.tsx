@@ -8,7 +8,7 @@ type Props = {
   onMove: (result: MoveResult) => void;
 };
 
-/** The board on @hello-pangea/dnd, as Ezo, Link and Consistency use it today. */
+/** The board on @hello-pangea/dnd, as Ezo, Link and Consistency used it before they moved to Drag. */
 export function PangeaBoard({ board, onStart, onMove }: Props) {
   return (
     <DragDropContext onDragStart={onStart} onDragEnd={(result: DropResult) => onMove(result)}>

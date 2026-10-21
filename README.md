@@ -12,7 +12,7 @@ pnpm add @0001-labs/drag@alpha
 
 ## Documentation
 
-Read the [documentation](https://drag.0001.dev/), try the [sortable demo](https://drag.0001.dev/examples/sortable/) and [grid demo](https://drag.0001.dev/examples/grid/), or open the [playground](https://drag.0001.dev/playground/). The [version guide](https://drag.0001.dev/start-here/install/#versions) distinguishes the published alpha from development APIs.
+Read the [documentation](https://drag.0001.dev/), try the [sortable demo](https://drag.0001.dev/examples/sortable/) and [grid demo](https://drag.0001.dev/examples/grid/), or open [Play](https://drag.0001.dev/#play) on the front page. The [version guide](https://drag.0001.dev/start-here/install/#versions) distinguishes the published alpha from development APIs.
 
 ## Core API
 
@@ -125,7 +125,7 @@ A gesture hears `origin`, `point` (squares, fractions included), `square` (the o
 
 ## Site
 
-https://drag.0001.dev holds the docs (Astro/Starlight) and the playground at `/playground/`: an Ezo board on Drag and on @hello-pangea/dnd, switched in place, each drag measured. A Cloudflare Worker serves both from `docs-dist` (`pnpm run deploy`).
+https://drag.0001.dev holds the docs (Astro/Starlight), with Play on the front page: an Ezo board on Drag and on @hello-pangea/dnd, switched in place, each drag measured. A Cloudflare Worker serves them from `docs-dist` (`pnpm run deploy`).
 
 ## Development
 
@@ -136,7 +136,7 @@ pnpm typecheck
 pnpm lint
 pnpm build
 pnpm docs:build
-pnpm playground:dev
+pnpm docs:dev
 pnpm test:browser
 ```
 

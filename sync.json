@@ -2,7 +2,7 @@
   "sources": {
     "Design system 1": {
       "root": {
-        "to": "playground/ds1",
+        "to": "play/ds1",
         "nativeControls": true,
         "modules": [
           "theme-bootstrap",
@@ -11,7 +11,7 @@
         "prose": true
       },
       "icons": {
-        "to": "playground/ds1/icons",
+        "to": "play/ds1/icons",
         "icons": [
           "handle"
         ]

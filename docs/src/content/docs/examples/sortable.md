@@ -14,4 +14,4 @@ Drag a handle, or focus it and press Space, then arrows, then Space or Enter. Es
   <p class="demo-status" role="status">Order: Read, Build, Ship</p>
 </div>
 
-This example uses `createSortable` and commits DOM order in `onDragEnd`. The [complete setup](/start-here/sortable/) shows the registrations and cleanup. For several lists, performance counters and an engine comparison, use the [playground](/playground/).
+This example uses `createSortable` and commits DOM order in `onDragEnd`. The [complete setup](/start-here/sortable/) shows the registrations and cleanup. For several lists, performance counters and an engine comparison, use [Play](/#play) on the front page.

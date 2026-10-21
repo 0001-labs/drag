@@ -5,8 +5,10 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
   site: 'https://drag.0001.dev',
   outDir: '../docs-dist',
-  publicDir: '../playground/ds1',
+  publicDir: '../play/ds1',
   devToolbar: { enabled: false },
+  // Play lived on a page of its own; it is on the front page now.
+  redirects: { '/playground': '/#play' },
   vite: { server: { fs: { allow: ['..'] } } },
   integrations: [starlight({
     title: 'Drag',
@@ -42,7 +44,7 @@ export default defineConfig({
         { label: 'Grid demo', slug: 'examples/grid' },
         { label: 'HTML lists', slug: 'examples/live-demo' },
         { label: 'Keyboard reorder', slug: 'examples/keyboard-reorder' },
-        { label: 'Playground', link: '/playground/' },
+        { label: 'Play', link: '/#play' },
       ] },
       { label: 'API', items: [
         { label: 'Sortable', slug: 'api/sortable' },

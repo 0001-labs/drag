@@ -47,9 +47,8 @@ export function App() {
   const Board = engine === 'drag' ? DragBoard : PangeaBoard;
 
   return (
-    <main className="page">
-      <header className="bar">
-        <h1 className="bar__title">Drag playground</h1>
+    <section className="play" aria-label="Play">
+      <div className="bar">
         <div className="ds-tabs" role="group" aria-label="Engine">
           {(['drag', 'pangea'] as const).map((value) => (
             <button key={value} type="button" className="ds-button" aria-pressed={engine === value} onClick={() => chooseEngine(value)}>
@@ -67,10 +66,7 @@ export function App() {
         <button type="button" className="ds-button ds-button--secondary" onClick={() => chooseLoad(load)}>
           Reset
         </button>
-        <a className="ds-link bar__docs" href="/">
-          Docs
-        </a>
-      </header>
+      </div>
       <p className="readout" aria-live="polite">
         {reading ? <ReadingLine engine={reading.engine} reading={reading.reading} /> : 'Move a cell, or a column by its name. On a phone, hold a cell to lift it. Each drag is measured from lift to drop.'}
       </p>
@@ -79,7 +75,7 @@ export function App() {
           <Board key={engine} board={board} onStart={onStart} onMove={onMove} />
         </Profiler>
       </div>
-    </main>
+    </section>
   );
 }
 
