@@ -102,7 +102,8 @@ export type UseSortableItemOptions = {
   type?: string;
   /** A selector for the handle inside the item; the item itself when left out. */
   handle?: string;
-  canDrag?: (by: { input: string }) => boolean;
+  /** Whether the item may lift now, by what and from where; see `SortableItemArgs.canDrag`. */
+  canDrag?: (by: { input: string; target: Element | null }) => boolean;
   allowInteractive?: boolean;
   label?: string;
 };
