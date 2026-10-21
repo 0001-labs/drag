@@ -1,234 +1,124 @@
 :root {
-  --sl-content-width: 58rem;
-  --sl-color-accent: #72ff3d;
-  --sl-color-accent-low: rgb(114 255 61 / 16%);
-  --sl-color-accent-high: #a6ff81;
-  --drag-docs-typeface: "GT-America-Standard-Regular", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --drag-docs-header-bg: light-dark(#ffffff, #1f1f1f);
-  --drag-docs-header-border: light-dark(#e0e0e0, #000000);
-  --drag-docs-header-text: light-dark(#2a2a2a, #f1f1f1);
-  --drag-docs-header-text-secondary: light-dark(#666666, #cdcdcd);
-  --drag-docs-accent: #72ff3d;
-  --drag-docs-sidebar-bg: light-dark(#fafafa, #1f1f1f);
-  --drag-docs-content-bg: light-dark(#ffffff, #171717);
-  --drag-docs-search-bg: light-dark(#f0f0f0, #171717);
-  --drag-docs-grid-line: light-dark(rgb(0 0 0 / 6%), rgb(255 255 255 / 4%));
-  --drag-docs-surface: light-dark(#ffffff, #202020);
-  --drag-docs-surface-border: light-dark(#dedede, #000000);
+  color-scheme: light dark;
+  --ds-sf: var(--sf, 1);
+  --grid: calc(20px * var(--sf, 1));
+  --docs-type: calc(14px * var(--sf, 1));
+  --docs-tracking: calc(-0.28px * var(--sf, 1));
+  --ds1-docs-divider: light-dark(#e0e0e0, #000000);
+  --ds1-docs-sidebar-bg: light-dark(#fafafa, #1f1f1f);
+
+  --sl-content-width: calc(36 * var(--grid));
+  --sl-sidebar-width: calc(8 * var(--grid));
+  --sl-nav-height: calc(3 * var(--grid));
+  --sl-text-code: calc(13px * var(--sf, 1));
+  --sl-line-height: 1.4286;
+  --sl-font: var(--ds-typeface-regular);
+  --sl-font-mono: var(--typeface-mono);
+  --sl-color-bg: var(--background);
+  --sl-color-bg-nav: var(--background);
+  --sl-color-bg-sidebar: var(--ds1-docs-sidebar-bg);
+  --sl-color-hairline: var(--ds1-docs-divider);
+  --sl-color-hairline-shade: var(--ds1-docs-divider);
+  --sl-color-text: var(--ds-text-color);
+  --sl-color-white: var(--ds-text-color);
+  --sl-color-accent: var(--ds-accent-color, var(--sharp-blue));
+  --sl-color-accent-high: var(--ds-text-color);
+  --sl-color-text-accent: var(--ds-text-color);
 }
 
-[data-theme="dark"] {
-  --sl-color-accent: #72ff3d;
-  --sl-color-accent-low: rgb(114 255 61 / 13%);
-  --sl-color-accent-high: #b9ff9b;
+:root[data-theme],
+:root[data-theme="dark"] {
+  --sl-color-bg: var(--background);
+  --sl-color-text: var(--ds-text-color);
+  --sl-color-white: var(--ds-text-color);
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  color: var(--drag-docs-header-text);
-  font-family: var(--drag-docs-typeface);
-  letter-spacing: 0;
-}
-
-.drag-heading,
-h1#_top {
-  display: flex;
-  align-items: center;
-  min-height: 40px;
-  margin: 0 0 40px;
-  color: var(--drag-docs-header-text);
-  font-size: 36px;
-  line-height: 1.1;
+body {
+  background: var(--background);
+  color: var(--ds-text-color);
+  font-family: var(--ds-typeface-regular);
+  font-feature-settings: var(--ds-font-features);
 }
 
 .main-pane,
-.content-panel {
-  position: relative;
-  z-index: 1;
-  background: var(--drag-docs-content-bg);
+.right-sidebar-panel {
+  font-size: var(--docs-type);
+  line-height: var(--grid);
+  letter-spacing: var(--docs-tracking);
 }
 
-.content-panel {
-  border-top-width: 0;
-  padding: 0;
-}
+.content-panel { border-top-width: 0; padding: var(--grid) calc(2 * var(--grid)); }
+.content-panel + .content-panel { padding-top: 0; }
+@media (max-width: 50rem) { .content-panel { padding-inline: var(--grid); } }
 
-.sl-markdown-content {
-  max-width: var(--sl-content-width);
-}
+/* Design system 1's root sheet has a .header of its own, a square item; Starlight's header is the page's width. */
+header.header { box-sizing: border-box; display: block; width: 100%; height: calc(3 * var(--grid)); border-bottom: 0; box-shadow: inset 0 -1px var(--ds1-docs-divider); padding: 0 var(--grid); }
+.sidebar-pane { border-inline-end: 0; box-shadow: inset -1px 0 var(--ds1-docs-divider); }
+.sidebar-content { padding: 0; height: 100%; }
+.sidebar-pane .sl-scroll, .sidebar-pane > .sidebar-content { height: 100%; }
 
-.sl-markdown-content a {
-  color: var(--sl-color-accent-high);
-}
-
-.sl-markdown-content :not(pre) > code {
-  border-radius: 4px;
-  background: var(--sl-color-accent-low);
-  color: var(--drag-docs-header-text);
-  font-size: 0.9em;
-}
-
-.hero-panel,
-.docs-demo,
-.api-card,
-.note-panel {
-  border: 1px solid var(--drag-docs-surface-border);
-  border-radius: 0;
-  background: var(--drag-docs-surface);
-}
-
-.hero-panel {
-  display: grid;
-  gap: 20px;
-  padding: 28px;
-}
-
-.hero-kicker {
-  margin: 0;
-  color: var(--drag-docs-accent);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.hero-title {
-  margin: 0;
-  color: var(--drag-docs-header-text);
-  font-size: clamp(42px, 8vw, 88px);
-  line-height: 0.92;
-}
-
-.hero-actions {
+/* A display title stands on two squares. */
+h1#_top {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.docs-button {
-  display: inline-flex;
   align-items: center;
-  min-height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--drag-docs-header-border);
-  color: var(--drag-docs-header-text);
-  text-decoration: none;
+  height: calc(2 * var(--grid));
+  margin: 0 0 var(--grid);
+  color: var(--ds-text-color);
 }
 
-.docs-button.primary {
-  border-color: var(--drag-docs-accent);
-  background: var(--drag-docs-accent);
-  color: #111111;
+/* Starlight's own markup inside the prose: its anchored headings and its code frames. */
+.sl-markdown-content :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper) + .sl-heading-wrapper:not(:where(.not-content *)) {
+  margin-top: calc(2 * var(--grid));
 }
-
-.docs-demo {
-  display: grid;
-  gap: 14px;
-  margin: 24px 0;
-  padding: 20px;
-}
-
-.docs-demo-header {
+.sl-markdown-content .sl-heading-wrapper {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: center;
+  align-items: flex-start;
+  gap: calc(10px * var(--sf, 1));
+  font-size: var(--docs-type);
+  line-height: var(--grid);
 }
+.sl-markdown-content .sl-heading-wrapper > :is(h1, h2, h3, h4, h5, h6) { display: block; margin: 0; padding: 0; }
+.sl-markdown-content .sl-heading-wrapper .sl-anchor-link { position: relative; display: flex; align-items: center; height: var(--grid); margin: 0; }
 
-.docs-demo-header h2,
-.docs-demo-header h3 {
-  margin: 0;
+/* Code frames: thirteen on the same rows, a square of room around it, its frame a hairline. */
+.expressive-code {
+  --ec-codeFontFml: var(--typeface-mono);
+  --ec-codePadInl: var(--grid);
+  --ec-brdRad: calc(4px * var(--sf, 1));
+  margin: var(--grid) 0;
+  font-size: calc(13px * var(--sf, 1));
+  line-height: var(--grid);
 }
+.expressive-code .frame { box-shadow: inset 0 0 0 1px var(--ds1-docs-divider); border-radius: calc(4px * var(--sf, 1)); }
+.expressive-code .frame pre { border: 0; background: transparent; }
+.expressive-code .frame pre > code { padding: var(--grid) 0; font-size: calc(13px * var(--sf, 1)); line-height: var(--grid); }
+.expressive-code .frame .ec-line { font-size: calc(13px * var(--sf, 1)); line-height: var(--grid); }
+.expressive-code .frame pre > code,
+.expressive-code .frame .ec-line,
+.expressive-code .frame .ec-line .code,
+.expressive-code .frame .ec-line .code span { font-family: var(--typeface-mono); }
 
-.status-pill {
-  max-width: 260px;
-  overflow: hidden;
-  color: var(--drag-docs-accent);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-.docs-list {
-  display: grid;
-  gap: 8px;
-}
+/* On this page: one square a line, muted, the section you are in in the ink. */
+.right-sidebar-panel h2 { font-size: var(--docs-type); font-weight: 400; color: var(--ds-text-color-muted); line-height: var(--grid); margin: 0; }
+.right-sidebar-panel a { font-size: var(--docs-type); line-height: var(--grid); padding-block: 0; color: var(--ds-text-color-muted); }
+.right-sidebar-panel a[aria-current="true"] { color: var(--ds-text-color); }
 
-drag-item {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  align-items: center;
-  min-height: 48px;
-  border: 1px solid var(--drag-docs-header-border);
-  background: var(--drag-docs-content-bg);
-}
+/* Previous and next at the foot, words alone. */
+.pagination-links a { border: 0; box-shadow: inset 0 0 0 1px var(--ds1-docs-divider); border-radius: calc(4px * var(--sf, 1)); font-size: var(--docs-type); line-height: var(--grid); }
+.pagination-links a .link-title { font-size: var(--docs-type); }
 
-drag-handle {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  margin-left: 8px;
-  color: var(--drag-docs-header-text-secondary);
-  cursor: grab;
-  user-select: none;
-}
-
-drag-handle:focus-visible {
-  outline: 2px solid var(--drag-docs-accent);
-  outline-offset: 2px;
-}
-
-drag-handle::before {
-  content: "↕";
-  font-size: 18px;
-}
-
-.item-label {
-  overflow: hidden;
-  padding: 0 14px;
-  color: var(--drag-docs-header-text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.api-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin: 24px 0;
-}
-
-.api-card,
-.note-panel {
-  padding: 18px;
-}
-
-.api-card h3,
-.note-panel h3 {
-  margin-top: 0;
-}
-
-body.sidebar-open {
-  overflow: hidden;
-}
-
-@media (max-width: 768px) {
-  .drag-heading,
-  h1#_top {
-    margin-bottom: 24px;
-    font-size: 28px;
-  }
-
-  .api-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .docs-demo-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
+/* Examples show Drag on the same square as the surrounding documentation. */
+.docs-demo { margin-block: var(--grid); padding: var(--grid); border: 1px solid var(--ds1-docs-divider); border-radius: calc(4px * var(--sf, 1)); }
+.docs-demo-header { display: flex; flex-wrap: wrap; gap: var(--grid); justify-content: space-between; margin-bottom: var(--grid); }
+.docs-demo-header h2, .docs-demo-header h3 { margin: 0; font: inherit; }
+.status-pill, .demo-status { color: var(--ds-text-color-muted); overflow-wrap: anywhere; }
+.docs-list, .sortable-demo-list { display: flex; flex-direction: column; gap: calc(var(--grid) / 2); padding: 0; list-style: none; }
+.docs-list drag-item, .sortable-demo-list li { display: flex; align-items: end; min-height: var(--grid); gap: calc(var(--grid) / 2); background: var(--background); line-height: calc(16px * var(--sf, 1)); }
+.docs-list drag-handle, .sortable-demo-list [data-demo-handle] { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 var(--grid); height: calc(16px * var(--sf, 1)); cursor: grab; border-radius: calc(4px * var(--sf, 1)); background: var(--ds-fill); color: var(--ds-text-color); }
+:is(drag-handle, [data-demo-handle], .grid-box):focus-visible { outline: 2px solid var(--ds-focus-ring); outline-offset: 2px; }
+.item-label { min-width: 0; }
+[data-drag-preview] { font-family: var(--ds-typeface-regular); background: var(--background); list-style: none; }
+.grid-demo { position: relative; width: 100%; height: calc(10 * var(--grid)); overflow: hidden; background-image: linear-gradient(var(--ds1-docs-divider) 1px, transparent 1px), linear-gradient(90deg, var(--ds1-docs-divider) 1px, transparent 1px); background-size: var(--grid) var(--grid); }
+.grid-box { position: absolute; inset: 0 auto auto 0; width: calc(4 * var(--grid)); height: calc(2 * var(--grid)); display: grid; place-items: center; background: var(--ds-fill); border: 1px solid var(--ds-text-color-muted); border-radius: calc(4px * var(--sf, 1)); cursor: grab; }
+.docs-version { font-size: calc(10px * var(--sf, 1)); color: var(--ds-text-color-muted); }

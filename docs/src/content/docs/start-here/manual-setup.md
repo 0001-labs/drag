@@ -1,9 +1,11 @@
 ---
-title: Manual Setup
+title: Native drag
 description: Register draggables, drop targets, and monitors manually.
 ---
 
-The core API is imperative. Register behavior against DOM elements, keep the cleanup function, and call it when your view unmounts.
+The element adapter uses native browser drag events. For pointer, touch and keyboard lists, start with [sortable](/start-here/sortable/).
+
+The native API is imperative. Register behavior against DOM elements, keep the cleanup function, and call it when your view unmounts.
 
 ```ts
 import { combine } from "@0001-labs/drag";

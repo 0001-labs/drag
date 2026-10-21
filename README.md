@@ -7,8 +7,12 @@ A small framework-agnostic drag-and-drop engine for TypeScript applications.
 ## Install
 
 ```bash
-pnpm add @0001-labs/drag
+pnpm add @0001-labs/drag@alpha
 ```
+
+## Documentation
+
+Read the [documentation](https://drag.0001.dev/), try the [sortable demo](https://drag.0001.dev/examples/sortable/) and [grid demo](https://drag.0001.dev/examples/grid/), or open the [playground](https://drag.0001.dev/playground/). The [version guide](https://drag.0001.dev/start-here/install/#versions) distinguishes the published alpha from development APIs.
 
 ## Core API
 

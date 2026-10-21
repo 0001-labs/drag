@@ -1,5 +1,16 @@
 ---
 import Default from '@astrojs/starlight/components/Head.astro';
+import { execFileSync } from 'node:child_process';
+const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: new URL('../../../', import.meta.url), encoding: 'utf8' }).trim();
 ---
-
 <Default><slot /></Default>
+<meta name="drag-revision" content={revision} />
+<link rel="stylesheet" href="/one.css" />
+<link rel="stylesheet" href="/prose.css" />
+<link rel="stylesheet" href="/controls.css" />
+<script>
+  import { startScaling } from '../../../playground/ds1/0-face/scaling';
+  import { setupDocsInteractions } from '../scripts/docs-interactions';
+  startScaling({ snap: 'layout' });
+  setupDocsInteractions();
+</script>

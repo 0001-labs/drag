@@ -3,6 +3,7 @@
     "commit": "ccc3b5968566fb22e56d4055b7a53f72f89d2843",
     "version": "0.3.0-alpha.15",
     "files": {
+      "playground/ds1/0-face/scaling.ts": "c19fb5d94a51cae0c727db701ba6aa00d7459a64164c05a1fa3cbd58d3841d03",
       "playground/ds1/0-face/theme-bootstrap.js": "64cf0f707eb05f6e02d53c48ac02f3000728058c6dce3175add402251859aa33",
       "playground/ds1/card.css": "9ea7815b710c695ca3acf0c1ca4b90c833da158b64087eb79f8987a5178e0ead",
       "playground/ds1/carousel.css": "32a89f451375653c22fa6f5bdad1c8b6efa863c12e19689db76dd7e45388442c",
@@ -27,10 +28,12 @@
       "playground/ds1/footer.css": "c6f26a81168bc51fa6661396dadc55b247ff122f4a1b5df536d7aff670436d1e",
       "playground/ds1/grid.css": "effe1e772aa2c08b309fb06be427955d24ef73e37dbacc549714edc040275c29",
       "playground/ds1/header.css": "54c2e9b78ea261ab557ee0ff344f23389809b37c7dbb9a72df388202e530b73c",
+      "playground/ds1/icons/handle.svg": "7822bb5d84c18c332b7e6bf2bbeaf626dedc06eeb06527cda26de3eb5da2cfd8",
       "playground/ds1/notice.css": "7ce2991337395cf63fe206b4f6b8b7e476dee8068c2fab091a117e835424396c",
       "playground/ds1/one.css": "c11b344a6024ffd6d5924c22e6bde3319d14bb9cea1c3d63fbe6b98317f3caef",
       "playground/ds1/palette.css": "a0fdc3dd2df5c9d05dd18f429be421355fcf3141356ad1d03ea64fc9d570cff0",
       "playground/ds1/progress.css": "cd7699d7a02634fb1b9d90b396ee149184727270c5ce241574b51d99d3936ca0",
+      "playground/ds1/prose.css": "32f6d49acb30ca5dd0cdf4f5f62f4cb5820b5cf56cc0142f589bac5bd3baed76",
       "playground/ds1/row.css": "f19fad4b7ed2629f8fb8ffb9b694e7e5852b10ce594ee77dd32a4db6af438265",
       "playground/ds1/table.css": "6d999ac1d8ef3a473ecea7c5d158454b3b8ff996138e729aaf7f4af97be53767",
       "playground/ds1/text.css": "56701cab5597c237dfee489719c01d53c2eb23d10ffc0f40ec5cee29a340805f"

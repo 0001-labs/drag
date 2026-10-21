@@ -1,37 +1,57 @@
 ---
-title: Element Adapter
-description: API reference for draggable elements, drop targets, and monitors.
+title: Element adapter
+description: Native browser drag sources, drop targets and monitors.
 ---
 
-The element adapter coordinates native browser drag events and turns them into typed lifecycle callbacks.
+```ts
+import { draggable, dropTargetForElements, monitorForElements } from '@0001-labs/drag/element';
+```
 
-<div class="api-grid">
-  <div class="api-card">
-    <h3>draggable</h3>
-    <p>Registers an element as a drag source and returns an idempotent cleanup function.</p>
-    <code>draggable({ element, dragHandle, getData, getNativeData })</code>
-  </div>
-  <div class="api-card">
-    <h3>dropTargetForElements</h3>
-    <p>Registers an element as a drop target for element drags.</p>
-    <code>dropTargetForElements({ element, canDrop, getData, getDropEffect })</code>
-  </div>
-  <div class="api-card">
-    <h3>monitorForElements</h3>
-    <p>Listens to element drag lifecycle events after source and target callbacks.</p>
-    <code>monitorForElements({ canMonitor, onDragStart, onDrop })</code>
-  </div>
-  <div class="api-card">
-    <h3>Lifecycle callbacks</h3>
-    <p>Use preview, start, target-change, drag, and drop callbacks for UI and state updates.</p>
-    <code>onGenerateDragPreview, onDragStart, onDropTargetChange, onDrag, onDrop</code>
-  </div>
-</div>
+The element adapter coordinates native browser drag events. It does not provide sortable previews, touch-hold gestures or keyboard reordering. Use [sortable](/start-here/sortable/) for those behaviors.
 
-## Event order
+Every registration returns an idempotent cleanup function. Duplicate source or target registrations for the same element throw.
 
-Events dispatch in this order:
+## draggable
 
-1. Drag source.
-2. Current drop targets from innermost to outermost.
-3. Monitors in creation order.
+```ts
+const cleanup = draggable({
+  element: row,
+  dragHandle: handle,
+  canDrag: ({ input, nativeEvent }) => true,
+  getData: () => ({ type: 'card', id: 'read' }),
+  getNativeData: () => ({ 'text/plain': 'Read the guide' }),
+  onDrop: ({ source, location }) => {
+    // Read the source and location.current.dropTargets.
+  },
+});
+```
+
+`element` is required; the other fields are optional. Local `getData` returns `Record<PropertyKey, unknown>`. Native `getNativeData` returns string values by MIME type for `DataTransfer`.
+
+## dropTargetForElements
+
+`element` is required. Optional callbacks are `canDrop(payload)`, `getData(payload)`, `getDropEffect(payload)` and `getIsSticky(payload)`, plus lifecycle callbacks. The drop effect is `copy`, `move` or `link`.
+
+Targets are resolved from the deepest DOM element outward. Rejecting an inner target does not reject its ancestors. Sticky targets can remain active while the pointer moves away, subject to the adapter's target resolution.
+
+## monitorForElements
+
+A monitor observes the drag after the source and targets. `canMonitor(payload)` selects sessions, and lifecycle callbacks receive the same payload. Monitors run in registration order.
+
+## Lifecycle
+
+`onGenerateDragPreview`, `onDragStart`, `onDropTargetChange`, `onDragEnter`, `onDragLeave`, `onDrag` and `onDrop` are available through `DragLifecycle`. Dispatch order is source, inner target, outer targets, then monitors. Enter and leave describe target transitions.
+
+## Payload
+
+| Field | Meaning |
+| --- | --- |
+| `sessionId`, `kind` | Session ID and the `element` drag kind. |
+| `source` | `{ element, dragHandle, data }`. |
+| `location.initial` | Input and targets at the start. |
+| `location.current` | Current input and targets, deepest first. |
+| `location.previous` | Previous drop targets. |
+| `nativeEvent` | The underlying `DragEvent`. |
+| `nativeSetDragImage` | Bound native preview setter when available, otherwise null. |
+
+A target record contains `element`, `kind`, `data` and `dropEffect`. Input includes modifier keys, mouse buttons, and client/page coordinates. Keep local data separate from native string data, and release every registration when its view unmounts.

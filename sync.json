@@ -4,7 +4,17 @@
       "root": {
         "to": "playground/ds1",
         "nativeControls": true,
-        "modules": ["theme-bootstrap"]
+        "modules": [
+          "theme-bootstrap",
+          "scaling"
+        ],
+        "prose": true
+      },
+      "icons": {
+        "to": "playground/ds1/icons",
+        "icons": [
+          "handle"
+        ]
       }
     }
   }

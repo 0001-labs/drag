@@ -1,47 +1,39 @@
 ---
-title: Introduction
-description: Learn how to install and use @0001-labs/drag.
+title: Drag
+description: Drag and drop for lists, boards and grids, with TypeScript, React or HTML.
 ---
 
-<div class="hero-panel">
-  <p class="hero-kicker">drag.0001.dev</p>
-  <h2 class="hero-title">Drag primitives for framework-neutral interfaces.</h2>
-  <p>
-    `@0001-labs/drag` is a small TypeScript drag-and-drop engine with element adapters,
-    drop targets, monitors, cleanup utilities, and Web Components for accessible list
-    reordering.
-  </p>
-  <div class="hero-actions">
-    <a class="docs-button primary" href="/start-here/manual-setup/">Manual Setup</a>
-    <a class="docs-button" href="/examples/live-demo/">Live Demo</a>
-  </div>
+Drag lets people move things in your interface with a mouse, a finger, a pen or the keyboard. Use it to reorder a list, carry an item between columns, or move a box across a grid.
+
+The engine is written in TypeScript and works without a framework. Your app owns the data and commits each change when the person drops it.
+
+[Install Drag](/start-here/install/), [try the sortable demo](/examples/sortable/), or open the [playground](/playground/).
+
+## Choose an API
+
+| You are building | Start with | What it does |
+| --- | --- | --- |
+| A sortable list or columns | [Sortable](/start-here/sortable/) | Moves a preview, makes room between items, scrolls at the edges and supports keyboard dragging. |
+| A React interface | [React](/start-here/react/) | A provider and ref hooks over the same sortable engine. |
+| A diagram or a canvas on squares | [Grid](/api/grid/) | Reports gestures in grid coordinates; you draw the movement and save the result. |
+| A small HTML list | [Web Components](/start-here/web-components/) | Custom elements that reorder their own children. |
+| Native browser drag events | [Element adapter](/api/element-adapter/) | Sources, drop targets and monitors with typed lifecycle events. |
+
+## Try it
+
+<div class="docs-demo" data-sortable-demo data-ds-not-prose>
+  <ul class="sortable-demo-list" aria-label="Reading list">
+    <li data-name="Read"><span data-demo-handle role="button" aria-label="Move Read"><span class="ds-icon" style="--ds-icon: url(/icons/handle.svg)" aria-hidden="true"></span></span><span>Read the guide</span></li>
+    <li data-name="Build"><span data-demo-handle role="button" aria-label="Move Build"><span class="ds-icon" style="--ds-icon: url(/icons/handle.svg)" aria-hidden="true"></span></span><span>Build a list</span></li>
+    <li data-name="Ship"><span data-demo-handle role="button" aria-label="Move Ship"><span class="ds-icon" style="--ds-icon: url(/icons/handle.svg)" aria-hidden="true"></span></span><span>Ship it</span></li>
+  </ul>
+  <p class="demo-status" role="status">Order: Read, Build, Ship</p>
 </div>
 
-## Install
+Drag a handle, or focus it and press Space to lift, arrows to move, and Space or Enter to drop. Escape cancels. On a touch screen, hold the handle before moving.
 
-```bash
-pnpm add @0001-labs/drag
-```
+## Open source
 
-```ts
-import { combine, reorder } from "@0001-labs/drag";
-import {
-  draggable,
-  dropTargetForElements,
-  monitorForElements,
-} from "@0001-labs/drag/element";
-```
+Drag is [MIT licensed](https://github.com/0001-labs/Drag/blob/main/LICENSE). The sortable motion carries over behavior from @hello-pangea/dnd; its attribution is in [NOTICE](https://github.com/0001-labs/Drag/blob/main/NOTICE). React is optional. The framework-neutral entry points do not need it.
 
-## What it gives you
-
-- A framework-agnostic element adapter.
-- Typed drag lifecycle payloads.
-- Drop targets resolved from the deepest DOM element upward.
-- Source → target → monitor event ordering.
-- Web Components for accessible list reordering.
-
-## Next Steps
-
-- [Manual Setup](/start-here/manual-setup/) - wire the imperative API.
-- [Live Demo](/examples/live-demo/) - try drag and keyboard reorder.
-- [Element Adapter](/api/element-adapter/) - review the core API.
+These guides follow the current source. See [installation and versions](/start-here/install/#versions) before choosing between the published alpha and a source build.

@@ -79,14 +79,16 @@
     "docs:build": "astro build --root docs",
     "docs:dev": "astro dev --root docs --host 127.0.0.1 --port 5197",
     "docs:preview": "astro preview --root docs --host 127.0.0.1 --port 5198",
-    "site:build": "pnpm docs:build && pnpm playground:build",
-    "deploy": "pnpm site:build && wrangler deploy",
+    "site:build": "ci-time build 'pnpm docs:build && pnpm playground:build'",
+    "deploy": "ci-time deploy 'sync1 guard && pnpm site:build && wrangler deploy'",
     "lint": "astro sync --root docs && eslint .",
     "test": "vitest run",
     "test:browser": "playwright test",
     "typecheck": "tsc --noEmit",
     "release": "node scripts/release.mjs",
-    "release:check": "pnpm typecheck && pnpm lint"
+    "release:check": "pnpm typecheck && pnpm lint",
+    "sync:check": "sync1 check",
+    "check": "pnpm sync:check && pnpm typecheck && pnpm lint"
   },
   "devDependencies": {
     "@astrojs/starlight": "^0.38.4",

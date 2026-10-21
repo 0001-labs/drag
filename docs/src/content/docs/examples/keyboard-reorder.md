@@ -1,28 +1,29 @@
 ---
-title: Keyboard Reorder
+title: Keyboard reorder
 description: Accessible reorder controls for list items.
 ---
 
 Pointer dragging should not be the only way to complete a reorder. The Web Component layer provides a focusable handle and keyboard movement by default.
 
-<div class="docs-demo" aria-label="Keyboard reorder demo">
+<div class="docs-demo" data-ds-not-prose aria-label="Keyboard reorder demo">
   <div class="docs-demo-header">
     <h2>Keyboard flow</h2>
     <span id="keyboard-demo-status" class="status-pill">Ready</span>
   </div>
   <drag-list class="docs-list" data-docs-demo data-status-target="keyboard-demo-status" data-announcement-target="keyboard-demo-announcement" aria-label="Keyboard reorder tasks">
     <drag-item value="focus" label="Focus the handle">
-      <drag-handle aria-label="Move Focus the handle"></drag-handle>
+      <drag-handle aria-label="Move Focus the handle"><span class="ds-icon" style="--ds-icon: url(/icons/handle.svg)" aria-hidden="true"></span></drag-handle>
       <span class="item-label">Focus the handle</span>
     </drag-item>
     <drag-item value="move" label="Press ArrowDown">
-      <drag-handle aria-label="Move Press ArrowDown"></drag-handle>
+      <drag-handle aria-label="Move Press ArrowDown"><span class="ds-icon" style="--ds-icon: url(/icons/handle.svg)" aria-hidden="true"></span></drag-handle>
       <span class="item-label">Press ArrowDown</span>
     </drag-item>
     <drag-item value="announce" label="Confirm the announcement">
-      <drag-handle aria-label="Move Confirm the announcement"></drag-handle>
+      <drag-handle aria-label="Move Confirm the announcement"><span class="ds-icon" style="--ds-icon: url(/icons/handle.svg)" aria-hidden="true"></span></drag-handle>
       <span class="item-label">Confirm the announcement</span>
     </drag-item>
+    <div data-0001-drag-live-region aria-live="polite" aria-atomic="true"></div>
   </drag-list>
 </div>
 
@@ -34,3 +35,5 @@ Pointer dragging should not be the only way to complete a reorder. The Web Compo
 - `ArrowDown` moves an item after its next sibling.
 - `Home` moves an item to the top.
 - `End` moves an item to the bottom.
+
+These examples use the HTML custom elements. Their arrow keys move immediately; the [sortable demo](/examples/sortable/) uses Space to lift and drop.
