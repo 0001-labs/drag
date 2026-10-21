@@ -12,9 +12,14 @@ test('docs homepage loads without console errors', async ({ page }) => {
 
   await expect(page.getByRole('link', { name: 'Drag' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Drag', exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Choose an API' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Play' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Documentation' })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('the overview chooses an API', async ({ page }) => {
+  await page.goto('/overview/');
+  await expect(page.getByRole('heading', { name: 'Choose an API' })).toBeVisible();
 });
 
 test('docs live example supports keyboard reorder', async ({ page }) => {

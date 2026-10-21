@@ -4,18 +4,6 @@ import '../../../play/style.css';
 ---
 <div class="play-host" data-play data-ds-not-prose></div>
 <script>
-  // React and both engines load only once Play comes near the screen.
-  for (const host of document.querySelectorAll<HTMLElement>('[data-play]')) {
-    const show = () => import('../../../play/mount').then(({ mountPlay }) => mountPlay(host));
-    if (!('IntersectionObserver' in window) || location.hash === '#play') {
-      void show();
-      continue;
-    }
-    const watch = new IntersectionObserver((entries) => {
-      if (!entries.some((entry) => entry.isIntersecting)) return;
-      watch.disconnect();
-      void show();
-    }, { rootMargin: '400px 0px' });
-    watch.observe(host);
-  }
+  import { mountPlay } from '../../../play/mount';
+  for (const host of document.querySelectorAll<HTMLElement>('[data-play]')) mountPlay(host);
 </script>

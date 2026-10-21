@@ -7,8 +7,8 @@ export default defineConfig({
   outDir: '../docs-dist',
   publicDir: '../play/ds1',
   devToolbar: { enabled: false },
-  // Play lived on a page of its own; it is on the front page now.
-  redirects: { '/playground': '/#play' },
+  // Play lived on a page of its own; it is the front page now.
+  redirects: { '/playground': '/' },
   vite: { server: { fs: { allow: ['..'] } } },
   integrations: [starlight({
     title: 'Drag',
@@ -31,7 +31,8 @@ export default defineConfig({
     },
     customCss: ['./src/styles/custom.css'],
     sidebar: [
-      { label: 'Overview', slug: '' },
+      { label: 'Play', slug: '' },
+      { label: 'Overview', slug: 'overview' },
       { label: 'Start here', items: [
         { label: 'Install', slug: 'start-here/install' },
         { label: 'Sortable lists', slug: 'start-here/sortable' },
@@ -44,7 +45,6 @@ export default defineConfig({
         { label: 'Grid demo', slug: 'examples/grid' },
         { label: 'HTML lists', slug: 'examples/live-demo' },
         { label: 'Keyboard reorder', slug: 'examples/keyboard-reorder' },
-        { label: 'Play', link: '/#play' },
       ] },
       { label: 'API', items: [
         { label: 'Sortable', slug: 'api/sortable' },

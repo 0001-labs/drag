@@ -21,7 +21,7 @@ const cellTitles = (page: Page, list: string, name: string) => column(page, list
 
 test.describe('Play', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/#play');
+    await page.goto('/');
     await expect(page.getByRole('region', { name: 'Play' })).toBeVisible();
   });
 
