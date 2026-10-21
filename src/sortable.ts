@@ -384,7 +384,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       const style = document.createElement('style');
       style.setAttribute(handleStyleId, '');
       style.textContent = handleStyles;
-      document.head.append(style);
+      document.head.appendChild(style);
     }
     instructions = hiddenText(document, `0001-drag-instructions-${++instanceCount}`);
     instructions.textContent = messages.instructions;
@@ -719,8 +719,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       willChange: 'transform',
       pointerEvents: 'none',
     });
-    overlay.append(preview);
-    document.body.append(overlay);
+    overlay.appendChild(preview);
+    document.body.appendChild(overlay);
 
     const element = registration.element;
     session = {
@@ -1400,7 +1400,7 @@ function hiddenText(document: Document, id: string): HTMLElement {
     whiteSpace: 'nowrap',
     border: '0',
   });
-  document.body.append(element);
+  document.body.appendChild(element);
   return element;
 }
 
