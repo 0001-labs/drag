@@ -85,6 +85,8 @@ A list with `isCombineEnabled` lets an item held over the middle of another comb
 
 A list with `still` keeps its items where they are while one is carried over it: nothing makes room, the keyboard steps the lifted item over each item in turn, and a drop lands at once, for a page that draws where the item will land itself (a board of squares). A list can also keep what is lifted from it on one line (`lockAxis`) and draw its own preview (`renderPreview`), in place of the engine's.
 
+An item making room carries how far it moved as `--drag-shift`, so what is inside it can stand still: `translate: calc(-1 * var(--drag-shift)) 0`.
+
 `canDrag({ input, target })` says whether an item may lift now, by `'mouse'`, `'pen'`, `'touch'` or `'keyboard'`, and from the element pressed. An item that is writing, a block an editor draws, takes `text: { hold: () => 400 }`: it keeps its caret, selection, cursor and keys, a mouse or pen lifts it only after a press held still that long (a press that moves sooner selects words), and the keyboard never lifts it. A hold of nought lifts it as soon as the press moves, as Aa does for blocks already selected. With `axis: 'y'` (or `'x'`), a press that first moves along that axis, at least twice as far as across, lifts at once without waiting: words are selected along a line, so a block moved down the page is told apart from words being selected, as Aa does for its blocks.
 
 ## Things on squares

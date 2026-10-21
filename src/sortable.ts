@@ -1054,6 +1054,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       existing.value = value;
     }
     element.style.translate = value === 0 ? 'none' : axis === 'vertical' ? `0 ${value}px` : `${value}px 0`;
+    // How far it stands off, for what inside it stays where it is (`translate: calc(-1 * var(--drag-shift)) 0`).
+    element.style.setProperty('--drag-shift', `${value}px`);
   }
 
   function scheduleAutoScroll(current: Session): void {
@@ -1269,6 +1271,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     for (const [shifted, saved] of current.shifts) {
       shifted.style.transition = 'none';
       shifted.style.translate = saved.translate;
+      shifted.style.removeProperty('--drag-shift');
     }
     const restored = [...current.shifts];
     view.requestAnimationFrame(() => {

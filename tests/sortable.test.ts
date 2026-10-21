@@ -87,8 +87,9 @@ describe('createSortable', () => {
     expect(updates).toEqual([]);
     pointer('pointermove', window, 10, 21);
     expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 1 });
-    // The sibling closes up by the cell and its pixel.
+    // The sibling closes up by the cell and its pixel, and says how far for what is inside it.
     expect(a.cells[1].style.translate).toBe('0 -20px');
+    expect(a.cells[1].style.getPropertyValue('--drag-shift')).toBe('-20px');
   });
 
   it('does not flicker back when the lifted item stops just past a centre', () => {
