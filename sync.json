@@ -6,7 +6,8 @@
         "nativeControls": true,
         "modules": [
           "theme-bootstrap",
-          "scaling"
+          "scaling",
+          "grid"
         ],
         "prose": true
       },

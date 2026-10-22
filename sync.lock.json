@@ -3,6 +3,9 @@
     "commit": "ccc3b5968566fb22e56d4055b7a53f72f89d2843",
     "version": "0.3.0-alpha.15",
     "files": {
+      "play/ds1/0-face/grid.ts": "e21f355524dd45ed9eb8b9e128da5c48dd0fbb5d1c6476c664ffcee2e9c72c2f",
+      "play/ds1/0-face/layout-inspector.ts": "ca9ce2b78b2e209331a7b27807d4d17b1d038654cf35bcdd348a7c32cab6136c",
+      "play/ds1/0-face/grid-fit.ts": "4c52a6b2f3c0cfaf5a47dba80cf4589c2370481bb4ea1f5fd1318c1f2d85cdaf",
       "play/ds1/0-face/scaling.ts": "c19fb5d94a51cae0c727db701ba6aa00d7459a64164c05a1fa3cbd58d3841d03",
       "play/ds1/0-face/theme-bootstrap.js": "64cf0f707eb05f6e02d53c48ac02f3000728058c6dce3175add402251859aa33",
       "play/ds1/card.css": "9ea7815b710c695ca3acf0c1ca4b90c833da158b64087eb79f8987a5178e0ead",
