@@ -30,7 +30,8 @@
     "access": "public"
   },
   "sideEffects": [
-    "./dist/elements.*"
+    "./dist/elements.*",
+    "./play/ds1/0-face/*"
   ],
   "files": [
     "dist",
