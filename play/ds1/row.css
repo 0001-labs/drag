@@ -21,6 +21,10 @@
  *   ds-row--auto           as high as its content, at least one square
  *   ds-row--stacked        the content stacked, each line one square (a tile, a card)
  *   ds-row--nav            a navigation row: the sidebar's two-pixel corners
+ *   ds-row__name           a record's words: they hug and give way first; cut, they fade over
+ *                          the last square, never an ellipsis (`data-cut="end"`, set by the
+ *                          element, or 0-face/cut-fade.ts on a page without Lit)
+ *   ds-row__value          the figure or date at the row's end, in tabular figures
  *   aria-current="page"    the destination being shown, filled and in the medium weight
  *   aria-disabled="true"   or `disabled` on a button: dimmed, not pressable
  *
@@ -32,7 +36,7 @@
  *   ds-sidebar             the tree (`role="tree"`)
  *   ds-sidebar__item       a row (`role="treeitem"`, `aria-level`, `aria-expanded` on a parent, `aria-selected`)
  *   ds-sidebar__disclosure the arrow on its own square, turned down when the row is open; empty on a leaf
- *   ds-sidebar__label      the words, cut short with an ellipsis
+ *   ds-sidebar__label      the words; cut, they fade over the last square (`data-cut="end"`)
  *   ds-sidebar__meta       small muted words at the row's end
  *
  * An icon (`.ds-icon`) in a tree row takes a square of its own. Tokens:
@@ -132,18 +136,52 @@ button.ds-row {
   z-index: 2;
 }
 
-/* The pointer, the press, the current destination and the focus ring. */
-a.ds-row[href]:hover,
-button.ds-row:hover:not(:disabled),
+/*
+ * The pointer, the press, the current destination and the focus ring are one layer under the
+ * row's content (Joachim, 19 October 2026). On a one-square row it is a square high and sits two
+ * pixels around what the row holds: from two above the lower sixteen to two below the row's foot,
+ * and two past the content at each side, its corners the icon tiles' 4px and those two more, so a
+ * 16px icon stands in it with two all round. It is drawn over the row, never moving its words or
+ * icons off the grid. An open row (`data-open`) wears the same layer. A taller row (a stacked
+ * tile, `auto`) is filled whole.
+ * Tokens: `--ds-row-fill-radius` (6px), `--ds-row-fill-overhang` (2px).
+ */
+a.ds-row,
+button.ds-row {
+  isolation: isolate;
+}
+a.ds-row::after,
+button.ds-row::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+a.ds-row::after,
+button.ds-row::after,
+.ds-row__target::after {
+  --ds-row-overhang: var(--ds-row-fill-overhang, calc(2px * var(--ds-sf)));
+  inset:
+    calc(var(--ds-row-height) - var(--ds-control-height) - var(--ds-row-overhang))
+    calc(var(--ds-row-padding, calc(4px * var(--ds-sf))) - var(--ds-row-overhang))
+    calc(0px - var(--ds-row-overhang));
+  border-radius: var(--ds-row-radius, var(--ds-row-fill-radius, calc(6px * var(--ds-sf))));
+}
+:is(a, button).ds-row:is(.ds-row--stacked, .ds-row--auto)::after,
+:is(.ds-row--stacked, .ds-row--auto) .ds-row__target::after {
+  inset: 0;
+}
+a.ds-row[href]:hover::after,
+button.ds-row:hover:not(:disabled)::after,
 .ds-row__target:is(a[href], button:not(:disabled)):hover::after {
   background: var(--ds-row-fill-hover, var(--ds-fill));
 }
-a.ds-row[href]:active,
-button.ds-row:active:not(:disabled),
+a.ds-row[href]:active::after,
+button.ds-row:active:not(:disabled)::after,
 .ds-row__target:is(a[href], button:not(:disabled)):active::after {
   background: var(--ds-row-fill-press, var(--ds-fill-hover));
 }
-.ds-row:is(a, button)[aria-current]:not([aria-current="false"]),
+.ds-row:is(a, button)[aria-current]:not([aria-current="false"])::after,
 .ds-row__target[aria-current]:not([aria-current="false"])::after {
   background: var(--ds-row-fill-current, var(--ds-fill-hover));
 }
@@ -152,8 +190,8 @@ button.ds-row:active:not(:disabled),
   --ds-type-weight-default: var(--ds-row-current-weight, 500);
   font-weight: var(--ds-row-current-weight, 500);
 }
-a.ds-row:focus-visible,
-button.ds-row:focus-visible,
+a.ds-row:focus-visible::after,
+button.ds-row:focus-visible::after,
 .ds-row__target:focus-visible::after {
   outline: 2px solid var(--ds-focus-ring);
   outline-offset: -2px;
@@ -169,13 +207,37 @@ button.ds-row[aria-disabled="true"],
 .ds-row__target:is(:disabled, [aria-disabled="true"], a:not([href])) {
   cursor: default;
 }
-a.ds-row[aria-disabled="true"]:hover,
-button.ds-row[aria-disabled="true"]:hover {
+a.ds-row[aria-disabled="true"]:hover::after,
+button.ds-row[aria-disabled="true"]:hover::after {
   background: none;
 }
 
 .ds-row--nav {
   --ds-row-radius: calc(2px * var(--ds-sf));
+}
+
+/* The parts of a record's row, as the element draws them: a 16px picture before the name takes
+   the first sixteen of its square and the row's 4px gap puts the words on the next; the name
+   hugs and gives way first; the value stands at the row's end. */
+.ds-row .ds-row__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+.ds-row .ds-row__name[data-cut="end"] {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--ds-unit)), transparent);
+}
+.ds-row:dir(rtl) .ds-row__name[data-cut="end"] {
+  mask-image: linear-gradient(to left, #000 calc(100% - var(--ds-unit)), transparent);
+}
+.ds-row .ds-row__value {
+  flex: none;
+  margin-inline-start: auto;
+  white-space: nowrap;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
 }
 
 /* A sidebar of nested things: the tree. */
@@ -273,7 +335,13 @@ button.ds-row[aria-disabled="true"]:hover {
   min-width: 0;
   padding-inline-start: calc(4px * var(--ds-sf));
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
+}
+.ds-sidebar__label[data-cut="end"] {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--ds-unit)), transparent);
+}
+.ds-sidebar__label[data-cut="end"]:dir(rtl) {
+  mask-image: linear-gradient(to left, #000 calc(100% - var(--ds-unit)), transparent);
 }
 .ds-sidebar__meta {
   flex: none;
@@ -297,4 +365,34 @@ button.ds-row[aria-disabled="true"]:hover {
   .ds-sidebar__disclosure {
     background-color: CanvasText;
   }
+}
+
+/* A controlled detail view: the caller marks its open row, and clears it on close.
+   Navigation's current state and the text weight remain independent. */
+.ds-row[data-open]:not([data-open="false"]) {
+  position: relative;
+  isolation: isolate;
+}
+.ds-row[data-open]:not([data-open="false"])::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  --ds-row-overhang: var(--ds-row-fill-overhang, calc(2px * var(--ds-sf)));
+  inset: calc(var(--ds-row-height) - var(--ds-control-height) - var(--ds-row-overhang))
+    calc(var(--ds-row-padding, calc(4px * var(--ds-sf))) - var(--ds-row-overhang))
+    calc(0px - var(--ds-row-overhang));
+  border-radius: var(--ds-row-radius, var(--ds-row-fill-radius, calc(6px * var(--ds-sf))));
+  background: var(--ds-row-fill-current, var(--ds-fill-hover));
+}
+/* A plain row (no press target inside) has no padding of its own: its words and icons stand on
+   the row's edges, so the layer reaches two past them, as a flush row's does. */
+.ds-row[data-open]:not([data-open="false"]):not(a, button, .ds-row--stacked, .ds-row--auto, :has(.ds-row__target))::after {
+  inset: calc(var(--ds-row-height) - var(--ds-control-height) - var(--ds-row-overhang))
+    calc(0px - var(--ds-row-overhang))
+    calc(0px - var(--ds-row-overhang));
+}
+.ds-row[data-open]:is(.ds-row--stacked, .ds-row--auto)::after { inset: 0; }
+@media (forced-colors: active) {
+  .ds-row[data-open]:not([data-open="false"])::after { outline: 1px solid Highlight; outline-offset: -1px; }
 }
