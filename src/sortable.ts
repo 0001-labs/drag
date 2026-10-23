@@ -141,7 +141,7 @@ export type SortableOptions = {
   /** Commit the final layout before landing. Return its authored item (which may have been redrawn).
    * Await layout work here; the preview then animates directly to this measured destination.
    * When supplied, this owns the commit; onDragEnd remains a completion notification. */
-  prepareDrop?: (result: SortableResult) => HTMLElement | null | Promise<HTMLElement | null>;
+  prepareDrop?: (result: SortableResult) => HTMLElement | null | (() => HTMLElement | null) | Promise<HTMLElement | null | (() => HTMLElement | null)>;
   /** How long a finger holds before the item lifts, in milliseconds. */
   touchHold?: number;
   /** How far a mouse or pen moves before the item lifts, in pixels. */
@@ -1172,7 +1172,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       const before = new Map(siblings.map(element => [element, element.getBoundingClientRect()]));
       for (const [element, saved] of current.shifts) { element.style.transition = 'none'; element.style.translate = saved.translate; }
       const prepared = options.prepareDrop({ ...startOf(current), destination: returning ? null : locationOf(current.destination!), combine: null, reason });
-      finalElement = prepared instanceof Promise ? await prepared : prepared;
+      const resolved = prepared instanceof Promise ? await prepared : prepared;
+      const locate = typeof resolved === 'function' ? resolved : () => resolved;
+      finalElement = locate();
       if (session !== current) return;
       if (finalElement?.isConnected) {
         current.landing = { element: finalElement, visibility: finalElement.style.visibility };
@@ -1180,6 +1182,12 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       }
       await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
       if (session !== current) return;
+      const updated = locate();
+      if (updated !== finalElement) {
+        if (current.landing) current.landing.element.style.visibility = current.landing.visibility;
+        finalElement = updated;
+        if (finalElement?.isConnected) { current.landing = { element: finalElement, visibility: finalElement.style.visibility }; finalElement.style.visibility = 'hidden'; }
+      }
       if (!reducedMotion) for (const element of siblings) {
         if (!element.isConnected || element === finalElement) continue;
         const old = before.get(element)!, next = element.getBoundingClientRect();
