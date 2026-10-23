@@ -295,6 +295,7 @@ type Session = {
   scrollFrame: number | null;
   impactFrame: number | null;
   dropping: boolean;
+  preparing?: boolean;
   landing?: { element: HTMLElement; visibility: string };
   /** The sibling the lifted item is held over, to combine with; the gap stays as it was. */
   combine: { container: ContainerSnapshot; slot: Slot } | null;
@@ -1167,6 +1168,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
 
     let finalElement: HTMLElement | null = null;
     if (reason === 'DROP' && options.prepareDrop) {
+      current.preparing = true;
       // Preserve the visual positions while the adapter commits the actual final structure.
       const siblings = [...current.shifts.keys()].filter(element => element.isConnected);
       const before = new Map(siblings.map(element => [element, element.getBoundingClientRect()]));
@@ -1396,7 +1398,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     destroy: () => {
       destroyed = true;
       clearPending();
-      if (session) cleanup(session);
+      // A prepared layout may destroy its old editor while replacing columns.
+      // The landing overlay owns its lifetime until the already-started handoff finishes.
+      if (session && !session.preparing) cleanup(session);
       window.removeEventListener('pointerdown', onPointerDown, true);
       window.removeEventListener('keydown', onHandleKeyDown, true);
       instructions?.remove();
