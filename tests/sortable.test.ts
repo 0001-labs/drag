@@ -66,6 +66,32 @@ describe('createSortable', () => {
     vi.useRealTimers();
   });
 
+  it('lands at the prepared authored layout and hands visibility back once', async () => {
+    sortable.destroy();
+    const a = column('a', 0, 3);
+    let final: HTMLElement;
+    sortable = createSortable({
+      prepareDrop: () => {
+        final = document.createElement('div'); a.list.append(final);
+        stubBox(final, 120, 140, 80, 20);
+        return final;
+      },
+      onDragEnd: result => ended.push(result),
+    });
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 35);
+    pointer('pointerup', window, 10, 35);
+    expect(final!.style.visibility).toBe('hidden');
+    await vi.advanceTimersByTimeAsync(20);
+    expect((document.querySelector('[data-drag-preview]') as HTMLElement).style.transform).toContain('120px, 140px');
+    expect(ended).toHaveLength(0);
+    await vi.runAllTimersAsync();
+    expect(final!.style.visibility).toBe('');
+    expect(ended).toHaveLength(1);
+    expect(document.querySelector('[data-drag-preview]')).toBeNull();
+  });
+
   it('waits for the mouse to move five pixels before it lifts', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');
