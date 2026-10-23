@@ -74,7 +74,8 @@ describe('createSortable', () => {
       prepareDrop: () => {
         final = document.createElement('div'); a.list.append(final);
         stubBox(final, 120, 140, 80, 20);
-        return final;
+        sortable.destroy(); // Nested editors are replaced when columns are committed.
+        return () => final;
       },
       onDragEnd: result => ended.push(result),
     });
