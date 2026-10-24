@@ -1,18 +1,22 @@
 {
   "Design system 1": {
-    "commit": "a11d790442994390130ee25b4ee91967eed73ca9",
+    "commit": "eadb85484aaff83092aaf7dce839a5656f9716fc",
     "version": "0.3.0-alpha.28",
     "files": {
-      "play/ds1/0-face/constraint-panel.ts": "86b7b3adeafb4c6b87d6f106f35c37c58b42f67bfaae81fea4f93705caf5c360",
-      "play/ds1/0-face/constraints.ts": "50dbfb22f035e49f20cd15469ae95597532dcb47fc3eabf499be3e5a7e6fd681",
+      "play/ds1/0-face/button-label.ts": "d5cbeaa064631584347d7888b0f78e92100d120c73b7e45ede402e4d5fd0a241",
+      "play/ds1/0-face/constraint-panel.ts": "d459e0c4c0707b1cd83eb7304d1a5428e6583b783b5b289f63eacc7a03a41698",
+      "play/ds1/0-face/constraint-site.ts": "82bc97d4f6b501c9745ab7d4e345f6bf1f795da036e657db8ad12d9d2ca19e69",
+      "play/ds1/0-face/constraints.ts": "bb4562b5f5d25a06086d29a1debcb8bb51df7780227a4f749a74f9a23a413d8a",
       "play/ds1/0-face/grid-fit.ts": "4c52a6b2f3c0cfaf5a47dba80cf4589c2370481bb4ea1f5fd1318c1f2d85cdaf",
-      "play/ds1/0-face/grid.ts": "75c4511a4e3db07e29b4341663208ea8b9008aed9286fff61ab844b10a56e3e7",
+      "play/ds1/0-face/grid.ts": "94315d84af62ed983b3ea382803967106dbe8b0c33933346190c045ee8b5ea41",
       "play/ds1/0-face/layout-inspector.ts": "ca9ce2b78b2e209331a7b27807d4d17b1d038654cf35bcdd348a7c32cab6136c",
-      "play/ds1/0-face/scaling.ts": "c19fb5d94a51cae0c727db701ba6aa00d7459a64164c05a1fa3cbd58d3841d03",
+      "play/ds1/0-face/scaling.ts": "4467a0aa6606b583ac243815e35b536dc8749775a2e2f4b3e6902e7e9822a8d5",
+      "play/ds1/0-face/text-contrast.ts": "e0ebaae4a037b12b93499d9448d142bdd4022f60d32df52afd3bf4d94d0a6cd0",
       "play/ds1/0-face/theme-bootstrap.js": "e7d3f639c4bdcfb1edb48a812a2a0a6dd313e65c3226076bd9303f87d91a106c",
+      "play/ds1/0-face/word-wrap.ts": "9db47c1b946fbe0a169d72cbd55770fdc5309a785b955d1e1a583b9603d65a0e",
       "play/ds1/bento.css": "1b2543696c613616a8bf67596b16368b3b6cd27b51af4536987f9f24d7c0d48a",
-      "play/ds1/card.css": "6079b3110feda2cf10743adce01524692dad90c2e31ad16e4d868fb58d867de9",
-      "play/ds1/carousel.css": "32a89f451375653c22fa6f5bdad1c8b6efa863c12e19689db76dd7e45388442c",
+      "play/ds1/card.css": "6c4a2d664e7c718e19d18495dc07e7b89fdfdf874aaeacb3522e248238b7b8df",
+      "play/ds1/carousel.css": "95077e777bc4b1e21c2fbadc076e06306bc8360c7e106fa1360d94fb324d8a48",
       "play/ds1/component-appearance.css": "dc1475596fc59566c77a77beb56f258c5f68931917338302a2c945ceae430460",
       "play/ds1/component-metrics.css": "1c5c0a1b5e309598e78bd76d95af941688de2d1dcd3e4e14222bd48560ff04c4",
       "play/ds1/component-tokens.css": "384c5e5ae8ce14172f6268b33fe0bde0bc7f3463f2f31ed97365516e270907c9",
@@ -20,7 +24,7 @@
       "play/ds1/controls.css": "89cab9c779fee97f302052345e01c582d707569de74d35228ba9d8bf34c30388",
       "play/ds1/document.css": "0acff588458f3e5b2f65bf5006f34c71e8cfbaa31b951feffd72a389001bdb52",
       "play/ds1/empty.css": "b47aa2b949aafbe63d9af6f6637a1eccec47efa5bbae7e3d4274ba6f21209d77",
-      "play/ds1/figures.css": "008c92e59c42e6de55150df962257d053acc378ce1d2949bd761e03bc2490ed2",
+      "play/ds1/figures.css": "a46bc6945232f2def777816b9f69046b72d98f6385e9e0a2176aa3546ce92e77",
       "play/ds1/fonts.css": "3a9c7d801717bcafa7b690d49bdf82e34a5a92a4f55d0c3edd9fe13b71d5496a",
       "play/ds1/fonts/GT-America-Compressed-Regular.woff2": "8acf3fcd5aa8e2c21ee47b7cf8a516f6baca1ad0bd0022e7768c0fb8c1503fe1",
       "play/ds1/fonts/GT-America-Standard-Medium.woff2": "57a819df4570d528961dea2c9c564b2f87600e9ebc5ece8d4704663c4d11f03a",
@@ -42,7 +46,7 @@
       "play/ds1/prose.css": "32f6d49acb30ca5dd0cdf4f5f62f4cb5820b5cf56cc0142f589bac5bd3baed76",
       "play/ds1/row.css": "59aef0202900d9cf56247360ce8a8c526e20c7e9d3b0aee1d59101f81039a94f",
       "play/ds1/table.css": "3c833ffa21d9db4efbd89e0a56ea22a388f7683504e03596517186f2f1a72541",
-      "play/ds1/text.css": "eee1f95f00ce10e2e6a1b0573915d197bfe1da95addbe73827b6e732ae43bcee"
+      "play/ds1/text.css": "f73bb91931b57407b888fcedd7dae073ea266f236ec68d0d2ec0160df6d7cb35"
     }
   }
 }
