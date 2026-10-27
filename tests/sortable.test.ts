@@ -66,6 +66,28 @@ describe('createSortable', () => {
     vi.useRealTimers();
   });
 
+  it('owns pointer and keyboard gestures in an iframe document', async () => {
+    const frame = document.createElement('iframe'); document.body.append(frame);
+    const doc = frame.contentDocument!, view = frame.contentWindow!;
+    const list = doc.createElement('div'); doc.body.append(list); stubBox(list, 0, 0, 100, 300);
+    const cells = [0, 1, 2].map(index => { const cell = doc.createElement('div'); cell.textContent = String(index); stubBox(cell, 0, index * 20, 80, 19); list.append(cell); return cell; });
+    register(sortable, { list, cells }, 'framed');
+    pointer('pointerdown', cells[0], 10, 10); pointer('pointermove', view, 10, 35);
+    expect(sortable.isDragging()).toBe(true);
+    expect(doc.querySelector('[data-drag-preview]')).not.toBeNull();
+    expect(document.querySelector('[data-drag-preview]')).toBeNull();
+    pointer('pointerup', view, 10, 35); await vi.runAllTimersAsync();
+    expect(ended[0]).toEqual(expect.objectContaining({ destination: { droppableId: 'framed', index: 1 }, reason: 'DROP' }));
+    cells[0].dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+    expect(sortable.isDragging()).toBe(true);
+    view.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await vi.runAllTimersAsync();
+    expect(ended.at(-1)?.reason).toBe('CANCEL');
+    const remove = vi.spyOn(view, 'removeEventListener'); sortable.destroy();
+    expect(remove).toHaveBeenCalledWith('pointerdown', expect.any(Function), true);
+    expect(doc.querySelector('[aria-live]')).toBeNull();
+  });
+
   it('lands at the prepared authored layout and hands visibility back once', async () => {
     sortable.destroy();
     const a = column('a', 0, 3);
