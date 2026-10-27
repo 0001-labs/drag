@@ -11,6 +11,7 @@ export default {
       files({ read, options }) {
         const files = new Map([
           ['sortable.ts', read('src/sortable.ts')],
+          ['flow.ts', read('src/flow.ts')],
           ['types.ts', read('src/types.ts')],
           ['util.ts', read('src/util.ts')],
           ['LICENSE', read('LICENSE')],
