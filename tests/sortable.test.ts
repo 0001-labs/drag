@@ -66,6 +66,23 @@ describe('createSortable', () => {
     vi.useRealTimers();
   });
 
+  it('preserves contextual appearance in the lifted clone and its descendants', () => {
+    const a = column('a', 0, 2);
+    const style = document.createElement('style');
+    style.textContent = '[data-id="a"] > div { background: rgb(20, 30, 40); padding: 3px; border-radius: 7px } [data-id="a"] strong { color: rgb(120, 40, 30); font-size: 18px }';
+    document.body.append(style);
+    a.cells[0].innerHTML = 'Words with <strong>emphasis</strong>';
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 35);
+    const preview = document.querySelector<HTMLElement>('[data-drag-preview]')!;
+    expect(getComputedStyle(preview).backgroundColor).toBe('rgb(20, 30, 40)');
+    expect(getComputedStyle(preview).padding).toBe('3px');
+    expect(getComputedStyle(preview).borderRadius).toBe('7px');
+    expect(getComputedStyle(preview.querySelector('strong')!).color).toBe('rgb(120, 40, 30)');
+    expect(getComputedStyle(preview.querySelector('strong')!).fontSize).toBe('18px');
+  });
+
   it('owns pointer and keyboard gestures in an iframe document', async () => {
     const frame = document.createElement('iframe'); document.body.append(frame);
     const doc = frame.contentDocument!, view = frame.contentWindow!;
