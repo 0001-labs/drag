@@ -121,6 +121,8 @@ describe('createSortable', () => {
   });
 
   it('lands at the prepared authored layout and hands visibility back once', async () => {
+    // The layout handoff waits for the owner window's frame; tie it to this test's clock.
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
     sortable.destroy();
     const a = column('a', 0, 3);
     let final: HTMLElement;
