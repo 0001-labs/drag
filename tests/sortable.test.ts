@@ -83,6 +83,21 @@ describe('createSortable', () => {
     expect(getComputedStyle(preview.querySelector('strong')!).fontSize).toBe('18px');
   });
 
+  it('lets overlay coordinates override copied logical insets', () => {
+    const a = column('a', 300, 2);
+    a.cells[0].style.setProperty('inset-inline', '0px', 'important');
+    a.cells[0].style.setProperty('inset-block', '0px', 'important');
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 310, 10);
+    pointer('pointermove', window, 310, 35);
+    const preview = document.querySelector<HTMLElement>('[data-drag-preview]')!;
+    expect(preview.style.getPropertyValue('inset-inline')).toBe('');
+    expect(preview.style.getPropertyValue('inset-block')).toBe('');
+    expect(preview.style.left).toBe('300px');
+    expect(preview.style.top).toBe('0px');
+    expect(a.cells[0].style.getPropertyValue('inset-inline')).toBe('0px');
+  });
+
   it('owns pointer and keyboard gestures in an iframe document', async () => {
     const frame = document.createElement('iframe'); document.body.append(frame);
     const doc = frame.contentDocument!, view = frame.contentWindow!;
