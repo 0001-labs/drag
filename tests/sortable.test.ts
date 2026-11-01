@@ -258,6 +258,30 @@ describe('createSortable', () => {
     delete document.visibilityState;
   });
 
+  it('ignores a second pointer while one carries an item', () => {
+    const a = column('a', 0, 3);
+    register(sortable, a, 'a');
+    const second = (type: string, target: EventTarget, x: number, y: number) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperties(event, { pointerId: { value: 2 }, pointerType: { value: 'touch' }, button: { value: 0 }, clientX: { value: x }, clientY: { value: y } });
+      target.dispatchEvent(event);
+    };
+    pointer('pointerdown', a.cells[0], 10, 10, 'touch');
+    vi.advanceTimersByTime(250);
+    expect(sortable.isDragging()).toBe(true);
+    second('pointerdown', a.cells[2], 10, 50);
+    second('pointermove', window, 10, 80);
+    second('pointerup', window, 10, 80);
+    second('pointercancel', window, 10, 80);
+    expect(sortable.isDragging()).toBe(true);
+    expect(updates).toEqual([]);
+    pointer('pointermove', window, 10, 40, 'touch');
+    pointer('pointerup', window, 10, 40, 'touch');
+    vi.runAllTimers();
+    expect(ended).toHaveLength(1);
+    expect(ended[0]).toEqual(expect.objectContaining({ draggableId: 'a0', destination: { droppableId: 'a', index: 1 }, reason: 'DROP' }));
+  });
+
   it('lifts on touch only after the hold, and lets a moving finger scroll', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');
