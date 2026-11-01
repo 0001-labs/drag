@@ -1262,6 +1262,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       const before = new Map(siblings.map(element => [element, element.getBoundingClientRect()]));
       const resting = restingBoxes(current, siblings);
       for (const [element, saved] of current.shifts) { element.style.transition = 'none'; element.style.translate = saved.translate; }
+      // The committed item takes the room a foreign list reserved for it: the reserve goes as the commit lands.
+      current.reserved?.registration.element.style.removeProperty('--drag-reserve');
       const prepared = options.prepareDrop({ ...startOf(current), destination: returning ? null : locationOf(current.destination!), combine: null, reason });
       const resolved = promiseLike(prepared) ? await prepared : prepared;
       const locate = typeof resolved === 'function' ? resolved : () => resolved;

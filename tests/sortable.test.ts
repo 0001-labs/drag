@@ -336,6 +336,25 @@ describe('createSortable', () => {
     await vi.runAllTimersAsync();
   });
 
+  it('hands a foreign list\'s reserved room to the commit', async () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
+    sortable.destroy();
+    const a = column('a', 0, 2), b = column('b', 100, 2);
+    const reserves: string[] = [];
+    sortable = createSortable({
+      prepareDrop: () => { reserves.push(b.list.style.getPropertyValue('--drag-reserve')); return a.cells[0]; },
+      onDragEnd: result => ended.push(result),
+    });
+    register(sortable, a, 'a'); register(sortable, b, 'b');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 110, 50);
+    expect(b.list.style.getPropertyValue('--drag-reserve')).toBe('20px');
+    pointer('pointerup', window, 110, 50);
+    await vi.runAllTimersAsync();
+    expect(reserves).toEqual(['']);
+    expect(ended[0]?.destination?.droppableId).toBe('b');
+  });
+
   it('lifts on touch only after the hold, and lets a moving finger scroll', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');
