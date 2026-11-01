@@ -572,6 +572,11 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (pending || session) event.preventDefault();
   }
 
+  /** A pressed or lifted item is the engine's: a native drag, even one WebKit starts from the lifted clone, would take the pointer away. */
+  function onNativeDragStart(event: Event): void {
+    if (pending || session) event.preventDefault();
+  }
+
   function onBlur(): void {
     clearPending();
     if (session && !session.dropping) void drop('CANCEL');
@@ -605,6 +610,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     view.addEventListener('pointercancel', onPointerCancel, true);
     view.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
     view.addEventListener('contextmenu', onContextMenu, true);
+    view.addEventListener('dragstart', onNativeDragStart, true);
     view.addEventListener('keydown', onKeyDown, true);
     view.addEventListener('blur', onBlur);
     view.addEventListener('pagehide', onVisibility);
@@ -621,6 +627,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     view.removeEventListener('pointercancel', onPointerCancel, true);
     view.removeEventListener('touchmove', onTouchMove, true);
     view.removeEventListener('contextmenu', onContextMenu, true);
+    view.removeEventListener('dragstart', onNativeDragStart, true);
     view.removeEventListener('keydown', onKeyDown, true);
     view.removeEventListener('blur', onBlur);
     view.removeEventListener('pagehide', onVisibility);

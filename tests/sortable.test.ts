@@ -223,6 +223,26 @@ describe('createSortable', () => {
     expect(ended[0]).toEqual(expect.objectContaining({ destination: null, reason: 'DROP' }));
   });
 
+  it('keeps a native drag from taking a pressed or lifted item, from the lifted clone too', () => {
+    const a = column('a', 0, 3);
+    register(sortable, a, 'a');
+    const nativeDrag = (target: EventTarget) => {
+      const event = new Event('dragstart', { bubbles: true, cancelable: true });
+      target.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    pointer('pointerdown', a.cells[0], 10, 10);
+    expect(nativeDrag(a.cells[0])).toBe(true);
+    pointer('pointermove', window, 10, 40);
+    const clone = document.querySelector('[data-drag-overlay]')!.firstElementChild!;
+    expect(nativeDrag(clone)).toBe(true);
+    pointer('pointermove', window, 300, 40);
+    pointer('pointerup', window, 300, 40);
+    vi.runAllTimers();
+    expect(ended[0]).toEqual(expect.objectContaining({ destination: null, reason: 'DROP' }));
+    expect(nativeDrag(a.cells[0])).toBe(false);
+  });
+
   it('cancels with Escape and sends the item home', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');
