@@ -234,6 +234,30 @@ describe('createSortable', () => {
     expect(ended[0]).toEqual(expect.objectContaining({ destination: null, reason: 'CANCEL' }));
   });
 
+  it('cancels when the page is hidden or left, as it does on blur', () => {
+    const a = column('a', 0, 3);
+    register(sortable, a, 'a');
+    let hidden = false;
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (hidden ? 'hidden' : 'visible') });
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 40);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(sortable.isDragging()).toBe(true);
+    hidden = true;
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.runAllTimers();
+    expect(ended[0]).toEqual(expect.objectContaining({ destination: null, reason: 'CANCEL' }));
+    hidden = false;
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 40);
+    window.dispatchEvent(new Event('pagehide'));
+    vi.runAllTimers();
+    expect(ended[1]).toEqual(expect.objectContaining({ destination: null, reason: 'CANCEL' }));
+    expect(document.querySelector('[data-drag-overlay]')).toBeNull();
+    // @ts-expect-error The test's own property is removed again.
+    delete document.visibilityState;
+  });
+
   it('lifts on touch only after the hold, and lets a moving finger scroll', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');

@@ -575,6 +575,12 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (session && !session.dropping) void drop('CANCEL');
   }
 
+  /** A page hidden or left mid-drag never sees its pointer come back: cancel, as a lost window does. */
+  function onVisibility(event: Event): void {
+    if (event.type === 'visibilitychange' && eventView?.document.visibilityState !== 'hidden') return;
+    onBlur();
+  }
+
   function onScroll(): void {
     if (!session || session.dropping || session.impactFrame !== null) return;
     const view = session.overlay.ownerDocument.defaultView;
@@ -599,6 +605,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     view.addEventListener('contextmenu', onContextMenu, true);
     view.addEventListener('keydown', onKeyDown, true);
     view.addEventListener('blur', onBlur);
+    view.addEventListener('pagehide', onVisibility);
+    view.document.addEventListener('visibilitychange', onVisibility);
     view.addEventListener('scroll', onScroll, true);
   }
 
@@ -613,6 +621,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     view.removeEventListener('contextmenu', onContextMenu, true);
     view.removeEventListener('keydown', onKeyDown, true);
     view.removeEventListener('blur', onBlur);
+    view.removeEventListener('pagehide', onVisibility);
+    view.document.removeEventListener('visibilitychange', onVisibility);
     view.removeEventListener('scroll', onScroll, true);
   }
 
