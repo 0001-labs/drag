@@ -344,6 +344,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   let eventView: Window | null = null;
   let destroyed = false;
   let reducedMotion = false;
+  /** Siblings still settling from the last drop: a new lift finishes them before it measures. */
+  const settling = new Set<Animation>();
   let liveRegion: HTMLElement | null = null;
 
   function container(args: SortableContainerArgs): Cleanup {
@@ -654,6 +656,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     pending = null;
 
     options.onBeforeCapture?.({ draggableId: pressed.id, mode });
+    // Lifted again before the last drop settled: measure the page where it rests, not mid-animation.
+    for (const animation of settling) animation.finish();
+    settling.clear();
     const registration = registrationFor(pressed);
     if (!registration) {
       removeWindowListeners();
@@ -1279,7 +1284,12 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         const old = before.get(element)!, next = element.getBoundingClientRect();
         reportDrop(element, resting.get(element)!, next);
         const x = old.left - next.left, y = old.top - next.top;
-        if (!reducedMotion && (x || y)) element.animate([{ translate: `${x}px ${y}px` }, { translate: (element.ownerDocument.defaultView ?? window).getComputedStyle(element).translate }], { duration: settings.outOfTheWay.duration, easing: settings.outOfTheWay.easing });
+        if (!reducedMotion && (x || y)) {
+          const animation = element.animate([{ translate: `${x}px ${y}px` }, { translate: (element.ownerDocument.defaultView ?? window).getComputedStyle(element).translate }], { duration: settings.outOfTheWay.duration, easing: settings.outOfTheWay.easing });
+          settling.add(animation);
+          animation.addEventListener?.('finish', () => settling.delete(animation));
+          animation.addEventListener?.('cancel', () => settling.delete(animation));
+        }
       }
     }
     const finalBox = finalElement?.isConnected ? finalElement.getBoundingClientRect() : null;

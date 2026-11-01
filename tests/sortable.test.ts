@@ -305,6 +305,37 @@ describe('createSortable', () => {
     expect(movements.filter((movement) => (movement as { element: Element }).element === child)).toEqual([]);
   });
 
+  it('finishes the last drop\'s settling before a new lift measures the page', async () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
+    sortable.destroy();
+    const a = column('a', 0, 3);
+    const finished: HTMLElement[] = [];
+    const animate = vi.fn(function (this: HTMLElement) {
+      return { finish: () => finished.push(this), addEventListener: () => {} } as unknown as Animation;
+    });
+    Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+    sortable = createSortable({
+      // The committed order draws a1 where a0 was.
+      prepareDrop: () => { stubBox(a.cells[1], 0, 0, cellWidth, cellHeight); stubBox(a.cells[0], 0, pitch, cellWidth, cellHeight); return a.cells[0]; },
+      onDragEnd: result => ended.push(result),
+    });
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 35);
+    pointer('pointerup', window, 10, 35);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(animate).toHaveBeenCalled();
+    await vi.runAllTimersAsync();
+    expect(ended).toHaveLength(1);
+    expect(finished).toEqual([]);
+    pointer('pointerdown', a.cells[2], 10, 50);
+    pointer('pointermove', window, 10, 60);
+    expect(finished).toContain(a.cells[1]);
+    // @ts-expect-error The test's own animate is removed again.
+    delete HTMLElement.prototype.animate;
+    await vi.runAllTimersAsync();
+  });
+
   it('lifts on touch only after the hold, and lets a moving finger scroll', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');
