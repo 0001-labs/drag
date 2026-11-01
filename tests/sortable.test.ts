@@ -282,6 +282,29 @@ describe('createSortable', () => {
     expect(ended[0]).toEqual(expect.objectContaining({ draggableId: 'a0', destination: { droppableId: 'a', index: 1 }, reason: 'DROP' }));
   });
 
+  it('never offers a list inside the lifted item, nor reports its items as moving', () => {
+    sortable.destroy();
+    const movements: unknown[] = [];
+    sortable = createSortable({ onDragEnd: (result) => ended.push(result), onMovement: (movement) => movements.push(movement) });
+    const a = column('a', 0, 3);
+    register(sortable, a, 'a');
+    // a0 holds a list of its own, drawn inside it.
+    const inner = document.createElement('div');
+    stubBox(inner, 0, 0, cellWidth, cellHeight);
+    const child = document.createElement('div');
+    stubBox(child, 0, 0, cellWidth, 10);
+    inner.append(child); a.cells[0].append(inner);
+    sortable.container({ element: inner, id: 'inner', type: 'cell' });
+    sortable.item({ element: child, id: 'child', type: 'cell' });
+    pointer('pointerdown', a.cells[0], 70, 15);
+    pointer('pointermove', window, 70, 9);
+    expect(sortable.isDragging()).toBe(true);
+    pointer('pointerup', window, 70, 9);
+    vi.runAllTimers();
+    expect(ended[0]?.destination?.droppableId).not.toBe('inner');
+    expect(movements.filter((movement) => (movement as { element: Element }).element === child)).toEqual([]);
+  });
+
   it('lifts on touch only after the hold, and lets a moving finger scroll', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');

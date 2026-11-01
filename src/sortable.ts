@@ -684,6 +684,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
 
     for (const candidate of containers.values()) {
       if (candidate.type !== registration.type || !candidate.element.isConnected || candidate.element.ownerDocument !== document) continue;
+      // A list inside the lifted item travels with it: never a destination, and its items never make room.
+      if (registration.element.contains(candidate.element)) continue;
       const members = itemsOf(candidate);
       const isHome = candidate === homeRegistration;
       const style = view.getComputedStyle(candidate.element);
