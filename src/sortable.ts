@@ -1288,6 +1288,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         const x = old.left - next.left, y = old.top - next.top;
         if (!reducedMotion && (x || y)) {
           const animation = element.animate([{ translate: `${x}px ${y}px` }, { translate: (element.ownerDocument.defaultView ?? window).getComputedStyle(element).translate }], { duration: settings.outOfTheWay.duration, easing: settings.outOfTheWay.easing });
+          // A page without the Web Animations API gives nothing back; there is nothing to finish then.
+          if (!animation) continue;
           settling.add(animation);
           animation.addEventListener?.('finish', () => settling.delete(animation));
           animation.addEventListener?.('cancel', () => settling.delete(animation));
