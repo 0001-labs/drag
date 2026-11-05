@@ -1,6 +1,6 @@
 {
   "source": "Design system 1/DS1",
-  "commit": "60199ed99a76f5cd64ec1d06b7b4ca0fa6675569",
+  "commit": "1f39be795d9ebb9604c89d1c3a41c67f486c8387",
   "components": [
     "header",
     "page",
@@ -72,9 +72,9 @@
     "3-unit/styles/ds-row.css": "ea0ce345e731ca9c2fc986d85c4f2a0e754ad63d3c8b31e563d0a2a22546103c",
     "3-unit/styles/ds-sidebar.css": "4385fdba0d8292952338d62e195874a978cb5654eb752a8690a6e4cf207c899f",
     "4-page/ds-header.ts": "bf317f89e3f5561f98f2e73471706f01a072e1d70ea3b64fa9b4c109ed4a95cc",
-    "4-page/ds-page.ts": "4c37cc86ac5cd93cf3c5d7154656eca1e9bcfeb1f4450448e43a3e4a35ae1183",
+    "4-page/ds-page.ts": "74ec13f0c6a07f09b0ecf35b62603d7da4dfbce91963c29342e27db270732663",
     "4-page/styles/ds-header.css": "16778aac36df094f4db6cc1b1148698a15aae037a3e7f2f2ebe320bac2021d10",
-    "4-page/styles/ds-page.css": "da633bc5a046d493da5630c26884f5de41ce8eb75192f1072387fbb55c9f769e",
+    "4-page/styles/ds-page.css": "3d05cd5c936dca3847f7725002bd58aa22361928e2dad83c93f029524607329a",
     "components.ts": "a488e3e2fcda16fd93edfbb781d6876e957b02aa1f357cbdf8f2c9579ad76717"
   }
 }

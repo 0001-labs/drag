@@ -1,6 +1,6 @@
 {
   "Design system 1": {
-    "commit": "cb0e5055fddada1cb5c92f29a8c2478fe228c445",
+    "commit": "7d263e585349752fd5e00deab63c31d864189134",
     "version": "0.3.2",
     "files": {
       "docs/src/vendor/ds1-docs/columns.astro": "bc4bfc8e9a70eb64e9e252968948ce6309a24bc6f18a6c29efff60602c7d1517",
@@ -71,10 +71,10 @@
       "docs/src/vendor/ds1/3-unit/styles/ds-row.css": "ea0ce345e731ca9c2fc986d85c4f2a0e754ad63d3c8b31e563d0a2a22546103c",
       "docs/src/vendor/ds1/3-unit/styles/ds-sidebar.css": "4385fdba0d8292952338d62e195874a978cb5654eb752a8690a6e4cf207c899f",
       "docs/src/vendor/ds1/4-page/ds-header.ts": "bf317f89e3f5561f98f2e73471706f01a072e1d70ea3b64fa9b4c109ed4a95cc",
-      "docs/src/vendor/ds1/4-page/ds-page.ts": "4c37cc86ac5cd93cf3c5d7154656eca1e9bcfeb1f4450448e43a3e4a35ae1183",
+      "docs/src/vendor/ds1/4-page/ds-page.ts": "74ec13f0c6a07f09b0ecf35b62603d7da4dfbce91963c29342e27db270732663",
       "docs/src/vendor/ds1/4-page/styles/ds-header.css": "16778aac36df094f4db6cc1b1148698a15aae037a3e7f2f2ebe320bac2021d10",
-      "docs/src/vendor/ds1/4-page/styles/ds-page.css": "da633bc5a046d493da5630c26884f5de41ce8eb75192f1072387fbb55c9f769e",
-      "docs/src/vendor/ds1/components-manifest.json": "08934310b8287e40d8db10985b0f584ff3ed315a3fba118668f8b0afcdd08237",
+      "docs/src/vendor/ds1/4-page/styles/ds-page.css": "3d05cd5c936dca3847f7725002bd58aa22361928e2dad83c93f029524607329a",
+      "docs/src/vendor/ds1/components-manifest.json": "077dd49b3b60f66dab30421b49e3ebe3b628a3d77da005adab7b43f5c2e7f42e",
       "docs/src/vendor/ds1/components.ts": "a488e3e2fcda16fd93edfbb781d6876e957b02aa1f357cbdf8f2c9579ad76717",
       "play/ds1/0-face/button-label.ts": "d5cbeaa064631584347d7888b0f78e92100d120c73b7e45ede402e4d5fd0a241",
       "play/ds1/0-face/constraint-panel.ts": "0d181e83d394941f257d6fb95c72c0ff28584fba2d8814fa89ec00991a2ee12e",
