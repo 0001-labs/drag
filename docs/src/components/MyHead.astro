@@ -9,6 +9,8 @@ const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: new URL('../.
 <link rel="stylesheet" href="/prose.css" />
 <link rel="stylesheet" href="/controls.css" />
 <script>
+  import { configureI18n } from '../vendor/ds1/0-face/i18n';
+  configureI18n({ languages: ['en'], autoLoad: false, sharedWords: true });
   import { startScaling } from '../../../play/ds1/0-face/scaling';
   // Design system 1's page inspection: five g show the grid, five l the layout, for everyone.
   import '../../../play/ds1/0-face/grid';

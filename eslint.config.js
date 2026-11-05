@@ -12,6 +12,7 @@ export default tseslint.config(
       'test-results/**',
       'node_modules/**',
       'play/ds1/**',
+      'docs/src/vendor/**',
     ],
   },
   js.configs.recommended,

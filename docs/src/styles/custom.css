@@ -121,3 +121,4 @@ h1#_top {
 [data-drag-preview] { font-family: var(--ds-typeface-regular); background: var(--background); list-style: none; }
 .grid-demo { position: relative; width: 100%; height: calc(10 * var(--grid)); overflow: hidden; background-image: linear-gradient(var(--ds1-docs-divider) 1px, transparent 1px), linear-gradient(90deg, var(--ds1-docs-divider) 1px, transparent 1px); background-size: var(--grid) var(--grid); }
 .grid-box { position: absolute; inset: 0 auto auto 0; width: calc(4 * var(--grid)); height: calc(2 * var(--grid)); display: grid; place-items: center; background: var(--ds-fill); border: 1px solid var(--ds-text-color-muted); border-radius: calc(4px * var(--sf, 1)); cursor: grab; }
+

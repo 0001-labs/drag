@@ -26,6 +26,8 @@ export default defineConfig({
       Head: './src/components/MyHead.astro',
       Header: './src/components/MyHeader.astro',
       Sidebar: './src/components/MySidebar.astro',
+      PageFrame: './src/components/PageFrame.astro',
+      TwoColumnContent: './src/components/TwoColumnContent.astro',
       MarkdownContent: './src/components/MarkdownContent.astro',
       PageTitle: './src/components/Heading.astro',
     },

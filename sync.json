@@ -16,6 +16,19 @@
         "icons": [
           "handle"
         ]
+      },
+      "components": {
+        "to": "docs/src/vendor/ds1",
+        "components": [
+          "page",
+          "sidebar",
+          "header"
+        ],
+        "react": false
+      },
+      "documentation": {
+        "to": "docs/src/vendor/ds1-docs",
+        "componentPath": "../ds1"
       }
     }
   }

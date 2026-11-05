@@ -1,0 +1,8 @@
+---
+import Frame from '../vendor/ds1-docs/frame.astro';
+---
+<Frame resizeKey="drag-sidebar-width">
+  <Fragment slot="header"><slot name="header" /></Fragment>
+  <Fragment slot="sidebar"><slot name="sidebar" /></Fragment>
+  <slot />
+</Frame>
