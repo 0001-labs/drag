@@ -1,6 +1,6 @@
 {
   "Design system 1": {
-    "commit": "7d263e585349752fd5e00deab63c31d864189134",
+    "commit": "2c13fcd18f5942bf380b091c7c55334b1d8e8f31",
     "version": "0.3.2",
     "files": {
       "docs/src/vendor/ds1-docs/columns.astro": "bc4bfc8e9a70eb64e9e252968948ce6309a24bc6f18a6c29efff60602c7d1517",
@@ -71,10 +71,10 @@
       "docs/src/vendor/ds1/3-unit/styles/ds-row.css": "ea0ce345e731ca9c2fc986d85c4f2a0e754ad63d3c8b31e563d0a2a22546103c",
       "docs/src/vendor/ds1/3-unit/styles/ds-sidebar.css": "4385fdba0d8292952338d62e195874a978cb5654eb752a8690a6e4cf207c899f",
       "docs/src/vendor/ds1/4-page/ds-header.ts": "bf317f89e3f5561f98f2e73471706f01a072e1d70ea3b64fa9b4c109ed4a95cc",
-      "docs/src/vendor/ds1/4-page/ds-page.ts": "74ec13f0c6a07f09b0ecf35b62603d7da4dfbce91963c29342e27db270732663",
+      "docs/src/vendor/ds1/4-page/ds-page.ts": "b631b2c23235836cf78403ff57907ea34bcdeefb8604564d3158b181c6f7b46a",
       "docs/src/vendor/ds1/4-page/styles/ds-header.css": "16778aac36df094f4db6cc1b1148698a15aae037a3e7f2f2ebe320bac2021d10",
-      "docs/src/vendor/ds1/4-page/styles/ds-page.css": "3d05cd5c936dca3847f7725002bd58aa22361928e2dad83c93f029524607329a",
-      "docs/src/vendor/ds1/components-manifest.json": "077dd49b3b60f66dab30421b49e3ebe3b628a3d77da005adab7b43f5c2e7f42e",
+      "docs/src/vendor/ds1/4-page/styles/ds-page.css": "ebff12a02bdeadda4f9830ac575b29d2945f55dccd0afddb7c80704a247154f0",
+      "docs/src/vendor/ds1/components-manifest.json": "470d18468764024ca7250d03531ef09043b4736268b58e52d7a1c093e45d7276",
       "docs/src/vendor/ds1/components.ts": "a488e3e2fcda16fd93edfbb781d6876e957b02aa1f357cbdf8f2c9579ad76717",
       "play/ds1/0-face/button-label.ts": "d5cbeaa064631584347d7888b0f78e92100d120c73b7e45ede402e4d5fd0a241",
       "play/ds1/0-face/constraint-panel.ts": "0d181e83d394941f257d6fb95c72c0ff28584fba2d8814fa89ec00991a2ee12e",
@@ -121,7 +121,7 @@
       "play/ds1/overlay.css": "71cfa69c0bf1d47a83c164999b52fc22ed1f8d2b565e69986f6b575c5b6519e0",
       "play/ds1/palette.css": "a0fdc3dd2df5c9d05dd18f429be421355fcf3141356ad1d03ea64fc9d570cff0",
       "play/ds1/progress.css": "f28a32cf3588339e4317c589f61e18ae1e2772d90014e00635012ff61e4d2f04",
-      "play/ds1/prose.css": "265b67b9762a01532ce7a185765bd38a8ce83e18b9cfab2b56f6b78a791ac173",
+      "play/ds1/prose.css": "a5c00648b8f4b73fea51d897e0a20530868fd47de24aad62b490234cd14612c7",
       "play/ds1/row.css": "a228fba4130d4fa5505b3d53889eee285b3618fb294291568539812ff729857f",
       "play/ds1/table.css": "d0dd4cc9193b519e1d48352093777bed6f0f3910146ee9506ce581d0ddca59f4",
       "play/ds1/text.css": "1292c6aea87f5a604400c655c18e67590b63198381d5d636d012e63f1122585e"
