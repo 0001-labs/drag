@@ -149,6 +149,27 @@ describe('createSortable', () => {
     expect(document.querySelector('[data-drag-preview]')).toBeNull();
   });
 
+  it('scrolls the shared board while the pointer crosses a gap between lists', async () => {
+    const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
+    const a = column('a', 0, 2);
+    const b = column('b', 100, 2);
+    const scroller = document.createElement('div');
+    scroller.style.overflowX = 'auto';
+    stubBox(scroller, 0, 0, 100, 400);
+    scroller.scrollBy = (x = 0) => { scroller.scrollLeft += Number(x); };
+    scroller.append(a.list, b.list);
+    document.body.append(scroller);
+    register(sortable, a, 'a');
+    register(sortable, b, 'b');
+
+    pointer('pointerdown', a.cells[0], 10, 60);
+    pointer('pointermove', window, 89, 60);
+    expect(updates.at(-1)).toBeNull();
+    await vi.advanceTimersByTimeAsync(32);
+    expect(scroller.scrollLeft).toBeGreaterThan(0);
+    frame.mockRestore();
+  });
+
   it('waits for the mouse to move five pixels before it lifts', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');

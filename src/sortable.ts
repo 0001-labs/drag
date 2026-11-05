@@ -1170,15 +1170,22 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         current.scrollFrame = view.requestAnimationFrame(step);
       }
     };
-    if (edgeSpeed(current, current.destination?.container.scroller ?? null, view)) {
+    if (edgeSpeed(current, scrollTarget(current), view)) {
       current.scrollFrame = view.requestAnimationFrame(step);
     }
+  }
+
+  function scrollTarget(current: Session): Scroller | null {
+    if (current.destination) return current.destination.container.scroller;
+    // A shared scroll area still needs to move while crossing the gaps between its lists.
+    const home = current.home.scroller;
+    return home && contains(home.box, current.lastX, current.lastY) ? home : null;
   }
 
   function autoScroll(current: Session): boolean {
     const view = current.overlay.ownerDocument.defaultView;
     if (!view) return false;
-    const scroller = current.destination?.container.scroller ?? null;
+    const scroller = scrollTarget(current);
     const speed = edgeSpeed(current, scroller, view);
     if (!speed) return false;
     if (scroller?.element) {
