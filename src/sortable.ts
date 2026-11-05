@@ -245,10 +245,9 @@ type ItemRegistration = Required<Omit<SortableItemArgs, 'handle' | 'canDrag' | '
 type Box = { left: number; top: number; width: number; height: number };
 
 type Scroller = {
-  element: HTMLElement | null;
+  element: HTMLElement;
   liftLeft: number;
   liftTop: number;
-  box: Box;
 };
 
 type Slot = {
@@ -263,7 +262,7 @@ type ContainerSnapshot = {
   box: Box;
   gap: number;
   paddingStart: number;
-  scroller: Scroller | null;
+  scrollers: Scroller[];
   /** The items other than the source, in order. */
   slots: Slot[];
   /** The room the lifted item takes in this container, its margins and gap included. */
@@ -305,7 +304,6 @@ type Session = {
   sourceIndex: number;
   home: ContainerSnapshot;
   containers: ContainerSnapshot[];
-  scrollers: Scroller[];
   windowLiftX: number;
   windowLiftY: number;
   overlay: HTMLElement;
@@ -690,7 +688,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       horizontal: parsePixels(sourceStyle.marginLeft) + parsePixels(sourceStyle.marginRight),
     };
     const itemScale = scaleOf(registration.element, liftBox);
-    const scrollers = new Map<HTMLElement | null, Scroller>();
+    const scrollers = new Map<HTMLElement, Scroller>();
     const snapshots: ContainerSnapshot[] = [];
     let sourceIndex = 0;
 
@@ -727,24 +725,21 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         }
         slots.push({ item: member, original, box: memberBox });
       });
-      const scrollElement = scrollParent(candidate.element);
-      let scroller = scrollers.get(scrollElement) ?? null;
-      if (!scroller && scrollElement) {
-        scroller = {
-          element: scrollElement,
-          liftLeft: scrollElement.scrollLeft,
-          liftTop: scrollElement.scrollTop,
-          box: measure(scrollElement),
-        };
-        scrollers.set(scrollElement, scroller);
-      }
+      const ancestors = scrollParents(candidate.element).map(element => {
+        let scroller = scrollers.get(element);
+        if (!scroller) {
+          scroller = { element, liftLeft: element.scrollLeft, liftTop: element.scrollTop };
+          scrollers.set(element, scroller);
+        }
+        return scroller;
+      });
       snapshots.push({
         registration: candidate,
         box,
         scale,
         gap,
         paddingStart: parsePixels(vertical ? style.paddingTop : style.paddingLeft) * scale,
-        scroller,
+        scrollers: ancestors,
         slots,
         // The lifted item's margin box and the list's gap: the room siblings give, none where they hold still.
         room: candidate.still ? 0 : (vertical ? liftBox.height + margins.vertical * itemScale : liftBox.width + margins.horizontal * itemScale) + gap,
@@ -813,7 +808,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       sourceIndex,
       home,
       containers: snapshots,
-      scrollers: [...scrollers.values()],
       windowLiftX: view.scrollX,
       windowLiftY: view.scrollY,
       overlay,
@@ -856,8 +850,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const view = current.overlay.ownerDocument.defaultView ?? window;
     let x = view.scrollX - current.windowLiftX;
     let y = view.scrollY - current.windowLiftY;
-    const scroller = snapshot.scroller;
-    if (scroller?.element) {
+    for (const scroller of snapshot.scrollers) {
       x += scroller.element.scrollLeft - scroller.liftLeft;
       y += scroller.element.scrollTop - scroller.liftTop;
     }
@@ -867,10 +860,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   function containerBox(current: Session, snapshot: ContainerSnapshot): Box {
     const offset = offsetOf(current, snapshot);
     const box = snapshot.box;
-    const scroller = snapshot.scroller;
     const visible = { ...box, left: box.left - offset.x, top: box.top - offset.y };
-    if (!scroller?.element) return visible;
-    return intersect(visible, scroller.box);
+    return snapshot.scrollers.reduce((clipped, { element }) => intersect(clipped, measure(element)), visible);
   }
 
   function updateImpact(current: Session): void {
@@ -992,22 +983,19 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   function revealPreview(current: Session): void {
     const view = current.overlay.ownerDocument.defaultView;
     if (!view) return;
-    const target = targetPosition(current);
-    const box = {
-      left: current.liftBox.left + target.x,
-      top: current.liftBox.top + target.y,
-      width: current.liftBox.width,
-      height: current.liftBox.height,
-    };
     const margin = settings.autoScrollEdge;
-    const scroller = current.destination?.container.scroller;
-    const into = (frame: Box) => ({
-      x: Math.min(0, box.left - margin - frame.left) + Math.max(0, box.left + box.width + margin - frame.left - frame.width),
-      y: Math.min(0, box.top - margin - frame.top) + Math.max(0, box.top + box.height + margin - frame.top - frame.height),
-    });
-    if (scroller?.element) {
-      const by = into(scroller.box);
-      if (by.x || by.y) scroller.element.scrollBy(by.x, by.y);
+    const into = (frame: Box) => {
+      const target = targetPosition(current);
+      const left = current.liftBox.left + target.x;
+      const top = current.liftBox.top + target.y;
+      return {
+        x: Math.min(0, left - margin - frame.left) + Math.max(0, left + current.liftBox.width + margin - frame.left - frame.width),
+        y: Math.min(0, top - margin - frame.top) + Math.max(0, top + current.liftBox.height + margin - frame.top - frame.height),
+      };
+    };
+    for (const { element } of current.destination?.container.scrollers ?? []) {
+      const by = into(measure(element));
+      if (by.x || by.y) element.scrollBy(by.x, by.y);
     }
     const page = into({ left: 0, top: 0, width: view.innerWidth, height: view.innerHeight });
     if (page.x || page.y) view.scrollBy(page.x, page.y);
@@ -1170,38 +1158,36 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         current.scrollFrame = view.requestAnimationFrame(step);
       }
     };
-    if (edgeSpeed(current, scrollTarget(current), view)) {
-      current.scrollFrame = view.requestAnimationFrame(step);
-    }
-  }
-
-  function scrollTarget(current: Session): Scroller | null {
-    if (current.destination) return current.destination.container.scroller;
-    // A shared scroll area still needs to move while crossing the gaps between its lists.
-    const home = current.home.scroller;
-    return home && contains(home.box, current.lastX, current.lastY) ? home : null;
+    current.scrollFrame = view.requestAnimationFrame(step);
   }
 
   function autoScroll(current: Session): boolean {
     const view = current.overlay.ownerDocument.defaultView;
     if (!view) return false;
-    const scroller = scrollTarget(current);
-    const speed = edgeSpeed(current, scroller, view);
-    if (!speed) return false;
-    if (scroller?.element) {
-      const before = { left: scroller.element.scrollLeft, top: scroller.element.scrollTop };
-      scroller.element.scrollBy(speed.x, speed.y);
-      if (scroller.element.scrollLeft !== before.left || scroller.element.scrollTop !== before.top) return true;
+    let movedX = false, movedY = false;
+    const scrollers = current.destination?.container.scrollers ?? current.home.scrollers;
+    for (const { element } of scrollers) {
+      const box = measure(element);
+      // Across a gutter, keep scrolling the shared ancestor under the pointer.
+      if (!contains(box, current.lastX, current.lastY)) continue;
+      const speed = edgeSpeed(current, box);
+      const x = movedX ? 0 : speed.x, y = movedY ? 0 : speed.y;
+      if (!x && !y) continue;
+      const before = { left: element.scrollLeft, top: element.scrollTop };
+      element.scrollBy(x, y);
+      movedX ||= element.scrollLeft !== before.left;
+      movedY ||= element.scrollTop !== before.top;
+      if (movedX && movedY) return true;
     }
-    const windowSpeed = edgeSpeed(current, null, view);
-    if (!windowSpeed) return false;
+    const page = edgeSpeed(current, { left: 0, top: 0, width: view.innerWidth, height: view.innerHeight });
+    const x = movedX ? 0 : page.x, y = movedY ? 0 : page.y;
+    if (!x && !y) return movedX || movedY;
     const before = { x: view.scrollX, y: view.scrollY };
-    view.scrollBy(windowSpeed.x, windowSpeed.y);
-    return view.scrollX !== before.x || view.scrollY !== before.y;
+    view.scrollBy(x, y);
+    return movedX || movedY || view.scrollX !== before.x || view.scrollY !== before.y;
   }
 
-  function edgeSpeed(current: Session, scroller: Scroller | null, view: Window): { x: number; y: number } | null {
-    const box = scroller?.element ? scroller.box : { left: 0, top: 0, width: view.innerWidth, height: view.innerHeight };
+  function edgeSpeed(current: Session, box: Box): { x: number; y: number } {
     const edge = settings.autoScrollEdge;
     const along = (position: number, start: number, length: number) => {
       const fromStart = position - start;
@@ -1212,7 +1198,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     };
     const x = along(current.lastX, box.left, box.width);
     const y = along(current.lastY, box.top, box.height);
-    return x || y ? { x, y } : null;
+    return { x, y };
   }
 
   async function drop(reason: SortableResult['reason']): Promise<void> {
@@ -1667,16 +1653,17 @@ function parseTranslate(transform: string): { x: number; y: number } {
   return match ? { x: Number(match[1]), y: Number(match[2]) } : { x: 0, y: 0 };
 }
 
-function scrollParent(element: HTMLElement): HTMLElement | null {
+function scrollParents(element: HTMLElement): HTMLElement[] {
+  const parents: HTMLElement[] = [];
   const view = element.ownerDocument.defaultView;
   let parent = element.parentElement;
   while (parent && parent !== element.ownerDocument.body && parent !== element.ownerDocument.documentElement) {
     const style = view?.getComputedStyle(parent);
     const scrolls = (value: string | undefined) => value === 'auto' || value === 'scroll' || value === 'overlay';
-    if (style && (scrolls(style.overflowY) || scrolls(style.overflowX))) return parent;
+    if (style && (scrolls(style.overflowY) || scrolls(style.overflowX))) parents.push(parent);
     parent = parent.parentElement;
   }
-  return null;
+  return parents;
 }
 
 function cloneForPreview(source: HTMLElement): HTMLElement {
