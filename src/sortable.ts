@@ -1692,6 +1692,13 @@ function cloneForPreview(source: HTMLElement): HTMLElement {
   originals.forEach((element, index) => {
     const target = copies[index];
     if (!target.style) return;
+    // A clone copies attributes, not properties: an element drawn from properties (a Lit element) gets them again.
+    const properties = (element.constructor as { elementProperties?: unknown }).elementProperties;
+    if (properties instanceof Map) {
+      for (const name of properties.keys() as Iterable<PropertyKey>) {
+        (target as unknown as Record<PropertyKey, unknown>)[name] = (element as unknown as Record<PropertyKey, unknown>)[name];
+      }
+    }
     const style = view.getComputedStyle(element);
     for (const property of Array.from(style)) {
       target.style.setProperty(property, style.getPropertyValue(property), 'important');

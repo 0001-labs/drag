@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LitElement, html } from 'lit';
 import { createSortable, type SortableController, type SortableResult } from '../src/sortable';
 
 const pitch = 20;
@@ -313,6 +314,29 @@ describe('createSortable', () => {
       pointer('pointermove', window, 110, 290);
       expect(updates.at(-1)).toEqual({ droppableId: 'b', index: 0 });
     });
+  });
+
+  it('gives the lifted clone the properties a Lit element was drawn from', async () => {
+    class DragTestAvatar extends LitElement {
+      static properties = { name: { type: String } };
+      declare name: string;
+      protected override render() { return html`<b>${this.name ?? '?'}</b>`; }
+    }
+    customElements.define('drag-test-avatar', DragTestAvatar);
+    const a = column('a', 0, 2);
+    const avatar = document.createElement('drag-test-avatar') as DragTestAvatar;
+    // Given as a property, not an attribute: a plain clone would draw the '?'.
+    avatar.name = 'Mika';
+    a.cells[0].append(avatar);
+    await avatar.updateComplete;
+    expect(avatar.shadowRoot?.textContent).toBe('Mika');
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 35);
+    const copy = document.querySelector<DragTestAvatar>('[data-drag-preview] drag-test-avatar')!;
+    expect(copy.name).toBe('Mika');
+    await copy.updateComplete;
+    expect(copy.shadowRoot?.textContent).toBe('Mika');
   });
 
   it('keeps a native drag from taking a pressed or lifted item, from the lifted clone too', () => {
