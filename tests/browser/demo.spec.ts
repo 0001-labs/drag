@@ -86,3 +86,39 @@ test('parent-owned sortable reorders inside a script-free iframe by pointer and 
   await expect(frame.locator('body')).toHaveAttribute('data-last', 'CANCEL:a:undefined');
   await expect(frame.locator('main > section')).toHaveText(['First', 'Second', 'Third']);
 });
+
+test('a column given as hit area takes a drop over its header and in the room below its cards', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/examples/');
+  await page.evaluate(async () => {
+    const source = '/src/sortable.ts';
+    const { createSortable } = await import(source) as typeof import('../../src/sortable');
+    const board = document.createElement('div'); board.id = 'board';
+    board.style.cssText = 'position:fixed;left:20px;top:20px;display:flex;gap:20px;z-index:9999;background:white';
+    board.innerHTML = ['a', 'b'].map(id => `<section id="col-${id}" style="width:160px;padding-bottom:40px;background:#eee"><h2 style="margin:0;height:60px">${id}</h2><ol id="list-${id}" style="list-style:none;margin:0;padding:0 0 var(--drag-reserve, 0px);display:flex;flex-direction:column;gap:10px">${[1, 2].map(n => `<li id="${id}${n}" style="height:50px;background:#ccc">${id}${n}</li>`).join('')}</ol></section>`).join('');
+    document.body.append(board);
+    const sortable = createSortable({ onDragEnd(result) { document.body.dataset.last = `${result.reason}:${result.draggableId}:${result.destination?.droppableId}:${result.destination?.index}`; } });
+    for (const id of ['a', 'b']) {
+      sortable.container({ element: document.getElementById(`list-${id}`)!, id, hitArea: document.getElementById(`col-${id}`)! });
+      for (const element of document.querySelectorAll<HTMLElement>(`#list-${id} li`)) sortable.item({ element, id: element.id });
+    }
+  });
+  const dragTo = async (from: string, ...points: Array<{ x: number; y: number }>) => {
+    const box = (await page.locator(from).boundingBox())!;
+    await page.mouse.move(box.x + 20, box.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 20, box.y + 40, { steps: 4 });
+    for (const point of points) {
+      await page.mouse.move(point.x, point.y, { steps: 12 });
+      await page.waitForTimeout(100);
+    }
+    await page.mouse.up();
+  };
+  const header = (await page.locator('#col-b h2').boundingBox())!;
+  await dragTo('#a1', { x: header.x + 20, y: header.y + 10 });
+  await expect(page.locator('body')).toHaveAttribute('data-last', 'DROP:a1:b:0');
+  // Over the column it reserves 60px of room below its cards; a drop there, below where the column ended at lift, lands last.
+  const column = (await page.locator('#col-b').boundingBox())!;
+  await dragTo('#a2', { x: header.x + 20, y: header.y + 10 }, { x: column.x + 20, y: column.y + column.height + 30 });
+  await expect(page.locator('body')).toHaveAttribute('data-last', 'DROP:a2:b:2');
+});

@@ -29,6 +29,8 @@ The preview is outside the original list's DOM ancestry. A rule like `.list > .r
 
 The engine owns movement styles during a gesture. Avoid competing animations or layout changes on the registered rows while it is measuring and moving them. A displaced item exposes `--drag-shift`; advanced layouts can counter-translate a child when that child should remain still.
 
+A list holding an item from another list exposes `--drag-reserve`, the room it makes for that item. Add it to the list's end padding, and register the column as the list's `hitArea` so a drop in that room lands in the list.
+
 ## Grid
 
 A grid gesture sets `data-drag-grid` on the document root. The grid engine does not draw a preview or apply movement to your boxes. Set their `transform` from `onMove`, commit on `onDrop`, and restore on `onCancel`.

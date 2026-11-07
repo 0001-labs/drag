@@ -244,6 +244,77 @@ describe('createSortable', () => {
     expect(ended[0]).toEqual(expect.objectContaining({ destination: null, reason: 'DROP' }));
   });
 
+  describe('a container with a hit area', () => {
+    /** A column: a header above the list and room below it, the list's box as it was. */
+    function boardColumn(id: string, left: number, count: number) {
+      const layout = column(id, left, count);
+      const wrapper = document.createElement('section');
+      stubBox(wrapper, left, -40, cellWidth, 520);
+      wrapper.append(layout.list);
+      document.body.append(wrapper);
+      return { ...layout, wrapper };
+    }
+
+    it('takes a drop over the header or below the last item, where the list alone would not', () => {
+      const a = column('a', 0, 2);
+      const b = boardColumn('b', 100, 2);
+      register(sortable, a, 'a');
+      sortable.container({ element: b.list, id: 'b', type: 'cell', hitArea: b.wrapper });
+      b.cells.forEach((cell, index) => sortable.item({ element: cell, id: `b${index}`, type: 'cell' }));
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 110, -20);
+      expect(updates.at(-1)).toEqual({ droppableId: 'b', index: 0 });
+      pointer('pointermove', window, 110, 450);
+      expect(updates.at(-1)).toEqual({ droppableId: 'b', index: 2 });
+      pointer('pointerup', window, 110, 450);
+      vi.runAllTimers();
+      expect(ended[0]).toEqual(expect.objectContaining({ destination: { droppableId: 'b', index: 2 }, reason: 'DROP' }));
+    });
+
+    it('is the list itself when left out', () => {
+      const a = column('a', 0, 2);
+      const b = boardColumn('b', 100, 2);
+      register(sortable, a, 'a');
+      register(sortable, b, 'b');
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 110, -20);
+      expect(updates.at(-1)).toBeNull();
+      pointer('pointermove', window, 110, 450);
+      expect(updates.at(-1)).toBeNull();
+    });
+
+    it('is measured as it stands at each move', () => {
+      const a = column('a', 0, 2);
+      const b = boardColumn('b', 100, 2);
+      register(sortable, a, 'a');
+      sortable.container({ element: b.list, id: 'b', type: 'cell', hitArea: b.wrapper });
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 110, 500);
+      expect(updates.at(-1)).toBeNull();
+      // The column grows by the room it reserves: the pointer is inside it now.
+      stubBox(b.wrapper, 100, -40, cellWidth, 560);
+      pointer('pointermove', window, 110, 500);
+      expect(updates.at(-1)).toEqual({ droppableId: 'b', index: 0 });
+    });
+
+    it('is clipped by what scrolls it', () => {
+      const a = column('a', 0, 2);
+      const b = boardColumn('b', 100, 2);
+      const scroller = document.createElement('div');
+      scroller.style.overflowY = 'auto';
+      stubBox(scroller, 100, 0, cellWidth, 300);
+      scroller.append(b.wrapper);
+      document.body.append(scroller);
+      register(sortable, a, 'a');
+      sortable.container({ element: b.list, id: 'b', type: 'cell', hitArea: b.wrapper });
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 110, -20);
+      expect(updates.at(-1)).toBeNull();
+      pointer('pointermove', window, 110, 290);
+      expect(updates.at(-1)).toEqual({ droppableId: 'b', index: 0 });
+    });
+  });
+
   it('keeps a native drag from taking a pressed or lifted item, from the lifted clone too', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');

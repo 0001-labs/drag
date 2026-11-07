@@ -35,6 +35,7 @@ import { createSortable } from '@0001-labs/drag/sortable';
 | `still` | Keeps surrounding items still; the app draws the destination itself. |
 | `lockAxis` | Constrains the preview to `x` or `y` for items lifted here. |
 | `renderPreview(source)` | Returns a preview element; null/undefined falls back to the controller preview or a clone. |
+| `hitArea` | The element whose box accepts a drop, measured as it stands at each move; the list itself when left out. Give a column so a drop over its header, its footer or the room below its last item lands in its list. Slots, flow and the landing still follow the list. |
 
 ## Item
 
