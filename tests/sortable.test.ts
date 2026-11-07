@@ -171,6 +171,30 @@ describe('createSortable', () => {
     frame.mockRestore();
   });
 
+  it('keeps the scroll band to a fifth of a short scroller', async () => {
+    const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
+    const a = column('a', 0, 8);
+    const scroller = document.createElement('div');
+    scroller.style.overflowY = 'auto';
+    // A list 100px tall shows: the band is 20px, not the 60px that would reach its middle.
+    stubBox(scroller, 0, 200, cellWidth, 100);
+    scroller.scrollBy = (...args: unknown[]) => { scroller.scrollTop += Number(args[1] ?? 0); };
+    scroller.append(a.list);
+    stubBox(a.list, 0, 200, cellWidth, 400);
+    a.cells.forEach((cell, index) => stubBox(cell, 0, 200 + index * pitch, cellWidth, cellHeight));
+    document.body.append(scroller);
+    register(sortable, a, 'a');
+
+    pointer('pointerdown', a.cells[0], 10, 210);
+    pointer('pointermove', window, 10, 270);
+    await vi.advanceTimersByTimeAsync(48);
+    expect(scroller.scrollTop).toBe(0);
+    pointer('pointermove', window, 10, 290);
+    await vi.advanceTimersByTimeAsync(48);
+    expect(scroller.scrollTop).toBeGreaterThan(0);
+    frame.mockRestore();
+  });
+
   it('waits for the mouse to move five pixels before it lifts', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');

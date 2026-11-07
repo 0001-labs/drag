@@ -84,7 +84,7 @@ Indexes start at zero. `FLUID` means pointer movement; `SNAP` means keyboard mov
 | --- | --- |
 | `dragDistance` | 5 pixels before mouse/pen lift. |
 | `touchHold` | 250 ms before touch lift. |
-| `autoScrollEdge` | 60 pixels from an edge. |
+| `autoScrollEdge` | 60 pixels from an edge, at most a fifth of the scroller's visible length. |
 | `outOfTheWay` | `{ duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' }`. |
 | `drop` | `{ minDuration: 330, maxDuration: 550, easing: 'cubic-bezier(.2, 1, .1, 1)' }`. |
 | `lockAxis` | Optional `x` or `y` preview constraint. |

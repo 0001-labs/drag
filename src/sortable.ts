@@ -158,7 +158,7 @@ export type SortableOptions = {
   outOfTheWay?: { duration: number; easing: string };
   /** The lifted item settling into its slot, its duration by distance. */
   drop?: { minDuration: number; maxDuration: number; easing: string };
-  /** How near an edge, in pixels, the pointer scrolls the list or the page. */
+  /** How near an edge, in pixels, the pointer scrolls the list or the page; never more than a fifth of the scroller's visible length. */
   autoScrollEdge?: number;
   /** Keep the lifted item on one line as the pointer moves: across ('x') or down ('y'). */
   lockAxis?: 'x' | 'y';
@@ -1204,8 +1204,10 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   }
 
   function edgeSpeed(current: Session, box: Box): { x: number; y: number } {
-    const edge = settings.autoScrollEdge;
     const along = (position: number, start: number, length: number) => {
+      // The band is at most a fifth of what is visible: a short list on a phone keeps a middle that holds still.
+      const edge = Math.min(settings.autoScrollEdge, length / 5);
+      if (edge <= 0) return 0;
       const fromStart = position - start;
       const fromEnd = start + length - position;
       if (fromStart < edge) return -maxScrollSpeed * ((edge - Math.max(fromStart, 0)) / edge) ** 2;
