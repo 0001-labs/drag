@@ -16,7 +16,8 @@ export function initGridFit(): void {
     frame = 0;
     const unit = measure.getBoundingClientRect().height;
     if (unit <= 0) return;
-    const elements = scopes.flatMap((scope) => Array.from(scope.querySelectorAll<HTMLElement>('[data-ds-area]')));
+    const activeScopes = scopes.filter((scope) => scope.isConnected);
+    const elements = [...new Set(activeScopes.flatMap((scope) => Array.from(scope.querySelectorAll<HTMLElement>('[data-ds-area]'))))];
     const current = new Set(elements);
     for (const [element, minimum] of originalMinimums) {
       if (!current.has(element)) {
@@ -30,15 +31,32 @@ export function initGridFit(): void {
       if (!originalMinimums.has(element)) originalMinimums.set(element, element.style.minHeight);
       element.style.minHeight = originalMinimums.get(element)!;
     });
-    // Fit children before their containing areas so nested measurements agree.
-    [...elements].reverse().forEach((element) => {
-      const height = element.getBoundingClientRect().height;
-      if (!height || getComputedStyle(element).display === 'none') return;
-      const rounded = Math.max(1, Math.ceil((height - 0.02) / unit)) * unit;
-      element.style.minHeight = `${rounded}px`;
-    });
+    // Children settle before their containing areas; siblings share one read phase
+    // so setting a minimum does not force another layout for every named area.
+    const depths = new Map<number, HTMLElement[]>();
+    for (const element of elements) {
+      let depth = 0;
+      for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+        if (current.has(parent)) depth++;
+      }
+      const siblings = depths.get(depth) ?? [];
+      siblings.push(element);
+      depths.set(depth, siblings);
+    }
+    for (const depth of [...depths.keys()].sort((a, b) => b - a)) {
+      const sizes = depths.get(depth)!.map((element) => ({
+        element,
+        height: element.getBoundingClientRect().height,
+        hidden: getComputedStyle(element).display === 'none',
+      }));
+      for (const { element, height, hidden } of sizes) {
+        if (!height || hidden) continue;
+        const rounded = Math.max(1, Math.ceil((height - 0.02) / unit)) * unit;
+        element.style.minHeight = `${rounded}px`;
+      }
+    }
 
-    const targets = new Set<HTMLElement>([measure, ...scopes, ...elements]);
+    const targets = new Set<HTMLElement>([measure, ...activeScopes, ...elements]);
     elements.forEach((element) => {
       for (const child of element.children) if (child instanceof HTMLElement) targets.add(child);
     });

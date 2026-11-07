@@ -1,17 +1,22 @@
 /**
  * Contrast watch: the `color.text-contrast` rule, run in the product on the theme the
  * person is using. Visible text under 4.5:1 is reported once per session as a
- * `contrast.<theme>.<component>` failure through `reportFailure`, which the Feedback loop
+ * `contrast.<theme>.element.<authored-key>` failure through `reportFailure`, which the Feedback loop
  * turns into an issue. The message names colours, ratio, component, element and path;
  * it never carries the page's text.
  *
  * Load it with a dynamic import once the page has loaded and gone idle, then call
  * `startContrastWatch()`; it does nothing per frame.
  */
-import { measureTextContrast, paintedParent, TEXT_CONTRAST_MINIMUM } from './text-contrast';
+import { scanTextContrast, paintedParent, TEXT_CONTRAST_MINIMUM } from './text-contrast';
 import { reportFailure, type Failure } from './failures';
+import { contrastIdentity, contrastSelectorRegistry, type ContrastSelector } from './contrast-selectors';
+export { contrastIdentity, contrastSelectorRegistry } from './contrast-selectors';
+export type { ContrastSelector } from './contrast-selectors';
 
 export type ContrastWatchOptions = {
+  /** At most 128 source-authored selector identities including DS1 defaults; never runtime/user data. */
+  selectors?: readonly ContrastSelector[];
   /** What is measured; the whole document by default. */
   root?: ParentNode;
   /** The least ratio, 4.5 by default. */
@@ -56,13 +61,6 @@ export function contrastComponent(element: Element): string {
   return element.localName;
 }
 
-const slug = (value: string) => value.toLowerCase().replace(/[^a-z0-9_.-]+/g, '-').replace(/^[^a-z0-9]+/, '').slice(0, 60) || 'text';
-// An id on a heading is often made from its words, so a heading is named by its class instead.
-const elementLabel = (e: Element) => {
-  const id = e.id && !/^h[1-6]$/.test(e.localName) ? `#${e.id.slice(0, 40)}` : '';
-  const name = e.classList[0];
-  return e.localName + (id || (name ? `.${name.slice(0, 40)}` : ''));
-};
 
 function hasTooMuchText(root: ParentNode) {
   const document = (root as Node).ownerDocument ?? root as Document;
@@ -84,6 +82,7 @@ export function startContrastWatch(options: ContrastWatchOptions = {}): () => vo
   if (typeof window === 'undefined' || typeof document === 'undefined') return () => {};
   const now = options.now ?? Date.now;
   const root = options.root ?? document;
+  const registry = contrastSelectorRegistry(document, options.selectors);
   const minimum = options.minimum ?? TEXT_CONTRAST_MINIMUM;
   const maxPerRun = options.maxPerRun ?? 10;
   const interval = options.interval ?? 10_000;
@@ -114,57 +113,77 @@ export function startContrastWatch(options: ContrastWatchOptions = {}): () => vo
   let burstStart = 0;
 
   function run() {
-    if (stopped || document.visibilityState !== 'visible') return;
+    if (stopped || settle !== undefined || document.visibilityState !== 'visible') return;
     const theme = contrastTheme(document);
     const path = location.pathname;
     const page = `${theme} ${path}`;
     // One run per theme and path, unless the theme changed since the last run.
     if (ran.has(page) && theme === lastTheme) return;
     if (now() < lastRun + interval) { schedule(); return; }
-    lastRun = now();
-    lastTheme = theme;
-    ran.add(page);
-    if (hasTooMuchText(root)) return;
+    const finish = () => {
+      lastRun = now();
+      lastTheme = theme;
+      ran.add(page);
+    };
+    if (hasTooMuchText(root)) { finish(); return; }
+    const scan = scanTextContrast(root);
     let count = 0;
-    for (const result of measureTextContrast(root)) {
-      if (count >= maxPerRun) break;
-      if (result.ratio === undefined || result.ratio >= minimum || !result.foreground || !result.background) continue;
-      const component = contrastComponent(result.element);
-      const key = [theme, path, component, result.foreground, result.background].join('|');
-      if (known.has(key)) continue;
-      remember(key);
-      count++;
-      // Rounded down, so a ratio just under the minimum never reads as meeting it.
-      const ratio = (Math.floor(result.ratio * 10) / 10).toFixed(1);
-      const message = `${result.foreground} on ${result.background}, ${ratio}:1 (${component} · ${elementLabel(result.element)}) on ${path}`.slice(0, 200);
-      report({ code: `contrast.${theme}.${slug(component)}`, message });
-      if (debug) console.warn(`[DS1 contrast] ${message}`, result.element);
+    function slice(idle?: IdleDeadline) {
+      if (stopped || settle !== undefined || document.visibilityState !== 'visible'
+        || location.pathname !== path || contrastTheme(document) !== theme) {
+        schedule();
+        return;
+      }
+      const end = performance.now() + Math.max(1, Math.min(8, idle?.timeRemaining() ?? 8));
+      do {
+        const next = scan.next();
+        if (next.done || count >= maxPerRun) { finish(); return; }
+        const result = next.value;
+        if (result?.ratio === undefined || result.ratio >= minimum || !result.foreground || !result.background) continue;
+        const identity = contrastIdentity(result.element, registry);
+        const key = `contrast.${theme}.${identity.key}`;
+        if (known.has(key)) continue;
+        remember(key);
+        count++;
+        // Rounded down, so a ratio just under the minimum never reads as meeting it.
+        const ratio = (Math.floor(result.ratio * 10) / 10).toFixed(1);
+        const message = `${result.foreground} on ${result.background}, ${ratio}:1 (${identity.label}) on ${path}`.slice(0, 200);
+        report({ code: key, message });
+        if (debug) console.warn(`[DS1 contrast] ${message}`, result.element);
+      } while (performance.now() < end);
+      atIdle(slice);
+    }
+    atIdle(slice);
+  }
+
+  function atIdle(callback: (idle?: IdleDeadline) => void) {
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(idle => { cancelIdle = undefined; callback(idle); }, { timeout: 5_000 });
+      cancelIdle = () => window.cancelIdleCallback(id);
+    } else {
+      const id = setTimeout(() => { cancelIdle = undefined; callback(); }, 1);
+      cancelIdle = () => clearTimeout(id);
     }
   }
 
   function schedule() {
-    if (stopped || timer !== undefined || cancelIdle || document.visibilityState !== 'visible') return;
+    if (stopped || settle !== undefined || timer !== undefined || cancelIdle || document.visibilityState !== 'visible') return;
     timer = setTimeout(() => {
       timer = undefined;
-      if ('requestIdleCallback' in window) {
-        const id = window.requestIdleCallback(() => { cancelIdle = undefined; run(); }, { timeout: 5_000 });
-        cancelIdle = () => window.cancelIdleCallback(id);
-      } else {
-        const id = setTimeout(() => { cancelIdle = undefined; run(); }, 1);
-        cancelIdle = () => clearTimeout(id);
-      }
+      atIdle(run);
     }, Math.max(0, lastRun + interval - now()));
   }
 
   // A burst of changes runs once it has been quiet for a moment; a page that never
   // stops changing still runs after five quiet periods.
-  const observer = new MutationObserver(() => {
+  const waitForQuiet = () => {
     const at = now();
     if (settle === undefined) burstStart = at;
     else if (at - burstStart > quiet * 5) return;
     clearTimeout(settle);
     settle = setTimeout(() => { settle = undefined; schedule(); }, quiet);
-  });
+  };
+  const observer = new MutationObserver(waitForQuiet);
   observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'theme'] });
   let media: MediaQueryList | null = null;
   try { media = window.matchMedia('(prefers-color-scheme: dark)'); } catch { /* No media queries. */ }
@@ -172,7 +191,7 @@ export function startContrastWatch(options: ContrastWatchOptions = {}): () => vo
   window.addEventListener('popstate', schedule);
   document.addEventListener('visibilitychange', schedule);
   media?.addEventListener?.('change', schedule);
-  schedule();
+  waitForQuiet();
 
   return () => {
     stopped = true;

@@ -1,6 +1,6 @@
 {
   "source": "Design system 1/DS1",
-  "commit": "2c13fcd18f5942bf380b091c7c55334b1d8e8f31",
+  "commit": "5ee8b8f54520e85865fa06ba59777256330789ac",
   "components": [
     "header",
     "page",
@@ -18,7 +18,7 @@
     "0-face/languages.ts": "96a7bca8acd7e9832d39c58d21f210fe6999731480a526374bcb6721c124987b",
     "0-face/shared-words.ts": "bf72ad8e6df18b13049a20e31d054108c682bd40b16fc3165a9131edcaa5240a",
     "0-face/sidebar.ts": "68e031f059b08689c24dad319d29def0ebdccc37e2c3d1b1b112b2747498dedc",
-    "0-face/text-contrast.ts": "6f86423c3a51d31fbaa711de633a12622cff43d62bd10822c22f4939e0acb4c9",
+    "0-face/text-contrast.ts": "c64f4b947ce0d8c10734f7c25a99058e3962e2f440dc4f319313056984bca360",
     "0-face/tooltips.ts": "22153475df1e0773040dabc824a9966698ba25ea2c30911b976fff2ccad5bc57",
     "0-face/translations-format.ts": "56d5dbaf2ff792c6139ab1587ab5e3d473de5ebf0bdac7463cae7d7bd3e1b4b5",
     "0-face/translations/da.json": "c0ed2f5e8b0b3f763bda13d03cad291ee0c30728138bf7e9a57c3925819b32f2",
