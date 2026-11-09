@@ -1,7 +1,7 @@
 {
   "name": "@0001-labs/drag",
   "version": "0.2.0-alpha.0",
-  "description": "A small framework-agnostic drag-and-drop engine with Web Component helpers.",
+  "description": "A drag-and-drop library for TypeScript that works with or without a framework.",
   "type": "module",
   "license": "MIT",
   "private": false,
