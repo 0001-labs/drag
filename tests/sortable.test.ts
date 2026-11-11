@@ -981,6 +981,20 @@ describe('createSortable', () => {
       expect(preview.querySelector<HTMLElement>('em')!.style.getPropertyPriority('color')).toBe('important');
     });
 
+    it('takes no press anywhere in it, whatever the item\'s own parts take', () => {
+      const a = column('a', 0, 2);
+      const style = document.createElement('style');
+      style.textContent = '[data-id="a"] button { pointer-events: auto }';
+      document.body.append(style);
+      a.cells[0].innerHTML = '<span><button>Press</button></span>';
+      sortable.item({ element: a.cells[0], id: 'a0', type: 'cell', allowInteractive: true });
+      sortable.container({ element: a.list, id: 'a', type: 'cell' });
+      const preview = lift(a.cells[0]);
+      expect(preview.style.pointerEvents).toBe('none');
+      for (const part of preview.querySelectorAll<HTMLElement>('*')) expect(part.style.getPropertyValue('pointer-events')).toBe('none');
+      expect(a.cells[0].querySelector('button')!.style.pointerEvents).toBe('');
+    });
+
     it('keeps what had scrolled inside the item where it stood', () => {
       const a = column('a', 0, 2);
       const track = document.createElement('div');

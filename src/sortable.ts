@@ -1900,6 +1900,8 @@ function cloneForPreview(source: HTMLElement): { clone: HTMLElement; scrolled: A
           }
         }
       }
+      // The copy is a picture: it takes no press, hover or native drag, whatever the item's own parts take.
+      styled.style.setProperty('pointer-events', 'none', 'important');
       target.removeAttribute('contenteditable');
       if (element.scrollLeft || element.scrollTop) scrolled.push([target, element.scrollLeft, element.scrollTop]);
       if (element.localName === 'canvas') paint(element as HTMLCanvasElement, target as HTMLCanvasElement);
