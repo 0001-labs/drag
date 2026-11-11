@@ -8,7 +8,8 @@ const cellWidth = 79;
 
 type Layout = { list: HTMLElement; cells: HTMLElement[] };
 
-function pointer(type: string, target: EventTarget, x: number, y: number, pointerType = 'mouse'): void {
+/** `buttons` is what a real mouse reports as it moves: 1 while pressed, 0 once released. */
+function pointer(type: string, target: EventTarget, x: number, y: number, pointerType = 'mouse', buttons?: number): void {
   const event = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperties(event, {
     pointerId: { value: 1 },
@@ -16,6 +17,7 @@ function pointer(type: string, target: EventTarget, x: number, y: number, pointe
     button: { value: 0 },
     clientX: { value: x },
     clientY: { value: y },
+    ...(buttons === undefined ? {} : { buttons: { value: buttons } }),
   });
   target.dispatchEvent(event);
 }
@@ -496,6 +498,121 @@ describe('createSortable', () => {
     await vi.runAllTimersAsync();
   });
 
+  it('lands where the item rests, and slides a list\'s items with their list rather than twice', async () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
+    sortable.destroy();
+    // Two columns in a row: each is an item of the row and a list of its own cells.
+    const row = document.createElement('div');
+    stubBox(row, 0, 0, 200, 400);
+    const a = column('a', 0, 2), b = column('b', 100, 1);
+    row.append(a.list, b.list);
+    document.body.append(row);
+    let sliding = false;
+    const started: Array<[HTMLElement, string]> = [];
+    Object.defineProperty(HTMLElement.prototype, 'animate', {
+      configurable: true,
+      value(this: HTMLElement, frames: Keyframe[]) {
+        started.push([this, String(frames[0].translate)]);
+        sliding = true;
+        return { finish: () => {}, addEventListener: () => {} } as unknown as Animation;
+      },
+    });
+    sortable = createSortable({
+      prepareDrop: () => {
+        // The commit draws column b 50px to the left, its cell with it, and the dropped cell under that one.
+        b.list.append(a.cells[0]);
+        stubBox(b.list, 50, 0, cellWidth, 400);
+        stubBox(b.cells[0], 50, 0, cellWidth, cellHeight);
+        // A browser applies a slide at once: while its column slides, the dropped cell is drawn 30px off its place.
+        a.cells[0].getBoundingClientRect = () => {
+          const left = sliding ? 80 : 50;
+          return { left, top: pitch, width: cellWidth, height: cellHeight, right: left + cellWidth, bottom: pitch + cellHeight, x: left, y: pitch, toJSON: () => ({}) };
+        };
+        return a.cells[0];
+      },
+      onDragEnd: result => ended.push(result),
+    });
+    sortable.container({ element: row, id: 'row', type: 'cell', axis: 'horizontal' });
+    sortable.item({ element: a.list, id: 'column-a', type: 'cell' });
+    sortable.item({ element: b.list, id: 'column-b', type: 'cell' });
+    register(sortable, a, 'a');
+    register(sortable, b, 'b');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 110, 30);
+    pointer('pointerup', window, 110, 30);
+    await vi.advanceTimersByTimeAsync(20);
+    // The column slides its 50px; its cell goes with it and is not sent 50px more.
+    expect(started).toEqual([[b.list, '50px 0px']]);
+    // The landing was measured before anything slid.
+    expect((document.querySelector('[data-drag-preview]') as HTMLElement).style.transform).toContain('translate3d(50px, 20px, 0)');
+    await vi.runAllTimersAsync();
+    expect(ended[0]?.destination).toEqual({ droppableId: 'b', index: 1 });
+    // @ts-expect-error The test's own animate is removed again.
+    delete HTMLElement.prototype.animate;
+  });
+
+  it('does not call an item moved when the list it stands in was still sliding at the drop', async () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
+    sortable.destroy();
+    const row = document.createElement('div');
+    stubBox(row, 0, 0, 200, 400);
+    const a = column('a', 0, 2), b = column('b', 100, 1);
+    row.append(a.list, b.list);
+    document.body.append(row);
+    Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: () => ({ finish: () => {}, addEventListener: () => {} }) });
+    const moves: Array<{ element: HTMLElement; phase: string; x: number }> = [];
+    sortable = createSortable({
+      onMovement: movement => moves.push(movement),
+      // The commit draws column b, and its cell, where the slide was taking them.
+      prepareDrop: () => { stubBox(b.list, 21, 0, cellWidth, 400); stubBox(b.cells[0], 21, 0, cellWidth, cellHeight); return a.list; },
+      onDragEnd: result => ended.push(result),
+    });
+    sortable.container({ element: row, id: 'row', type: 'cell', axis: 'horizontal' });
+    sortable.item({ element: a.list, id: 'column-a', type: 'cell' });
+    sortable.item({ element: b.list, id: 'column-b', type: 'cell' });
+    register(sortable, a, 'a');
+    register(sortable, b, 'b');
+    // Column a is carried past column b, which starts sliding 79px to the left to make room.
+    pointer('pointerdown', a.list, 10, 300);
+    pointer('pointermove', window, 130, 300);
+    expect(b.list.style.translate).toBe('-79px 0');
+    // Dropped half way through that slide: the column and the cell in it are drawn 40px along.
+    const computed = window.getComputedStyle.bind(window);
+    const style = vi.spyOn(window, 'getComputedStyle').mockImplementation((element: Element, pseudo?: string | null) =>
+      element === b.list ? Object.assign(Object.create(computed(element)) as CSSStyleDeclaration, { translate: '-40px 0px' }) : computed(element, pseudo));
+    stubBox(b.list, 60, 0, cellWidth, 400);
+    stubBox(b.cells[0], 60, 0, cellWidth, cellHeight);
+    pointer('pointerup', window, 130, 300);
+    // The commit ends the slide: from here the column is drawn where it is set to stand.
+    style.mockRestore();
+    await vi.runAllTimersAsync();
+    expect(ended).toHaveLength(1);
+    // Both end where they were heading: nothing moved a second time.
+    expect(moves.filter(({ phase }) => phase === 'drop')).toEqual([]);
+    // @ts-expect-error The test's own animate is removed again.
+    delete HTMLElement.prototype.animate;
+  });
+
+  it('reports a sibling the page moves after a prepared drop was measured', async () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
+    sortable.destroy();
+    const a = column('a', 0, 3);
+    const moves: Array<{ element: HTMLElement; phase: string; y: number }> = [];
+    sortable = createSortable({
+      onMovement: movement => moves.push(movement),
+      prepareDrop: () => a.cells[0],
+      // The page draws once more as the drag ends, and puts a sibling 30px lower than it committed it.
+      onDragEnd: () => stubBox(a.cells[2], 0, 2 * pitch + 30, cellWidth, cellHeight),
+    });
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 14);
+    pointer('pointermove', window, 10, 16);
+    pointer('pointerup', window, 10, 16);
+    await vi.runAllTimersAsync();
+    expect(moves.filter(({ phase }) => phase === 'drop')).toEqual([expect.objectContaining({ element: a.cells[2], y: 30 })]);
+  });
+
   it('hands a foreign list\'s reserved room to the commit', async () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
     sortable.destroy();
@@ -804,6 +921,282 @@ describe('createSortable', () => {
     expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 2 });
   });
 
+  describe('the lifted clone', () => {
+    const lift = (cell: HTMLElement) => {
+      pointer('pointerdown', cell, 10, 10);
+      pointer('pointermove', window, 10, 35);
+      return document.querySelector<HTMLElement>('[data-drag-preview]')!;
+    };
+
+    it('gives the page the last word on it before it is shown', () => {
+      sortable.destroy();
+      const a = column('a', 0, 2);
+      const seen: unknown[] = [];
+      sortable = createSortable({
+        onPreview: (preview, source) => {
+          seen.push(preview.isConnected, source === a.cells[0]);
+          preview.removeAttribute('data-selected');
+          preview.append(Object.assign(document.createElement('i'), { textContent: '3' }));
+        },
+      });
+      a.cells[0].setAttribute('data-selected', '');
+      register(sortable, a, 'a');
+      const preview = lift(a.cells[0]);
+      expect(seen).toEqual([false, true]);
+      expect(preview.hasAttribute('data-selected')).toBe(false);
+      expect(preview.querySelector('i')?.textContent).toBe('3');
+      // The item itself is the page's: nothing is taken from it or added to it.
+      expect(a.cells[0].hasAttribute('data-selected')).toBe(true);
+      expect(a.cells[0].querySelector('i')).toBeNull();
+    });
+
+    it('copies the tree of a component the page has no definition for, as it stands', () => {
+      const a = column('a', 0, 2);
+      // Made in another window and adopted here: this page never draws it again.
+      const foreign = document.createElement('drag-foreign-part');
+      foreign.attachShadow({ mode: 'open' }).innerHTML = '<style>b{color:rgb(1, 2, 3)}</style><b>Drawn elsewhere</b><slot></slot>';
+      const inner = document.createElement('drag-foreign-inner');
+      inner.attachShadow({ mode: 'open' }).innerHTML = '<u>Inside</u>';
+      foreign.shadowRoot!.append(inner);
+      a.cells[0].append(foreign);
+      register(sortable, a, 'a');
+      const copy = lift(a.cells[0]).querySelector('drag-foreign-part')!;
+      expect(copy.shadowRoot?.querySelector('b')?.textContent).toBe('Drawn elsewhere');
+      expect(copy.shadowRoot?.querySelector('style')?.textContent).toContain('rgb(1, 2, 3)');
+      expect(copy.shadowRoot?.querySelector('drag-foreign-inner')?.shadowRoot?.textContent).toBe('Inside');
+      // The page's own tree is untouched.
+      expect(foreign.shadowRoot?.querySelector('b')?.textContent).toBe('Drawn elsewhere');
+    });
+
+    it('copies nothing inside an element that is not drawn', () => {
+      const a = column('a', 0, 2);
+      const style = document.createElement('style');
+      style.textContent = '.gone { display: none } .gone span, em { color: rgb(9, 9, 9) }';
+      document.body.append(style);
+      a.cells[0].innerHTML = '<div class="gone"><span>hidden</span></div><em>shown</em>';
+      register(sortable, a, 'a');
+      const preview = lift(a.cells[0]);
+      expect(preview.querySelector<HTMLElement>('.gone')!.style.getPropertyValue('display')).toBe('none');
+      expect(preview.querySelector<HTMLElement>('.gone span')!.style.length).toBe(0);
+      expect(preview.querySelector<HTMLElement>('em')!.style.getPropertyPriority('color')).toBe('important');
+    });
+
+    it('keeps what had scrolled inside the item where it stood', () => {
+      const a = column('a', 0, 2);
+      const track = document.createElement('div');
+      a.cells[0].append(track);
+      track.scrollLeft = 240;
+      track.scrollTop = 12;
+      register(sortable, a, 'a');
+      const copy = lift(a.cells[0]).querySelector('div')!;
+      expect([copy.scrollLeft, copy.scrollTop]).toEqual([240, 12]);
+    });
+  });
+
+  it('turns scroll anchoring off while an item is carried, so a commit off screen never scrolls the page', () => {
+    const a = column('a', 0, 2);
+    register(sortable, a, 'a');
+    expect(document.querySelector('style[data-0001-drag-sortable-style]')?.textContent).toMatch(/:root\[data-drag-active\] \*\{[^}]*overflow-anchor:none!important/);
+  });
+
+  describe('edge scrolling', () => {
+    /** A scroller 200px tall from 200 down: its bands are the top and bottom 40px. */
+    function scrolling(period = 16) {
+      let now = 0;
+      const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(now += period), period));
+      const a = column('a', 0, 10);
+      const scroller = document.createElement('div');
+      scroller.style.overflowY = 'auto';
+      stubBox(scroller, 0, 200, cellWidth, 200);
+      scroller.scrollBy = (...args: unknown[]) => { scroller.scrollTop += Number(args[1] ?? 0); };
+      scroller.append(a.list);
+      stubBox(a.list, 0, 200, cellWidth, 400);
+      a.cells.forEach((cell, index) => stubBox(cell, 0, 200 + index * pitch, cellWidth, cellHeight));
+      document.body.append(scroller);
+      register(sortable, a, 'a');
+      return { a, scroller, frame };
+    }
+
+    it('leaves an edge the item was lifted beside alone until the pointer goes on towards it', async () => {
+      const { a, scroller, frame } = scrolling();
+      // Pressed 30px from the foot, inside the band, and carried up: nobody asked to scroll.
+      pointer('pointerdown', a.cells[8], 10, 370);
+      pointer('pointermove', window, 10, 364);
+      expect(sortable.isDragging()).toBe(true);
+      await vi.advanceTimersByTimeAsync(64);
+      expect(scroller.scrollTop).toBe(0);
+      // Back past where it was pressed, but not far enough to mean it.
+      pointer('pointermove', window, 10, 376);
+      await vi.advanceTimersByTimeAsync(64);
+      expect(scroller.scrollTop).toBe(0);
+      // On towards the edge: now it scrolls.
+      pointer('pointermove', window, 10, 382);
+      await vi.advanceTimersByTimeAsync(64);
+      expect(scroller.scrollTop).toBeGreaterThan(0);
+      frame.mockRestore();
+    });
+
+    it('scrolls an edge the pointer has left and come back to', async () => {
+      const { a, scroller, frame } = scrolling();
+      pointer('pointerdown', a.cells[8], 10, 370);
+      pointer('pointermove', window, 10, 300);
+      await vi.advanceTimersByTimeAsync(32);
+      expect(scroller.scrollTop).toBe(0);
+      pointer('pointermove', window, 10, 372);
+      await vi.advanceTimersByTimeAsync(64);
+      expect(scroller.scrollTop).toBeGreaterThan(0);
+      frame.mockRestore();
+    });
+
+    it('scrolls as far in a second on a fast screen as on a slow one', async () => {
+      const distance = async (period: number) => {
+        const { a, scroller, frame } = scrolling(period);
+        pointer('pointerdown', a.cells[2], 10, 250);
+        pointer('pointermove', window, 10, 390);
+        await vi.advanceTimersByTimeAsync(480);
+        const scrolled = scroller.scrollTop;
+        pointer('pointerup', window, 10, 390);
+        await vi.runAllTimersAsync();
+        frame.mockRestore();
+        sortable.destroy();
+        document.body.replaceChildren();
+        sortable = createSortable();
+        return scrolled;
+      };
+      const slow = await distance(16), fast = await distance(8);
+      expect(slow).toBeGreaterThan(200);
+      expect(fast / slow).toBeGreaterThan(0.9);
+      expect(fast / slow).toBeLessThan(1.1);
+    });
+
+    it('still scrolls where a frame is owed less than a pixel', async () => {
+      const { a, scroller, frame } = scrolling();
+      pointer('pointerdown', a.cells[2], 10, 250);
+      // Just inside the band: a fraction of a pixel a frame.
+      pointer('pointermove', window, 10, 366);
+      await vi.advanceTimersByTimeAsync(160);
+      expect(scroller.scrollTop).toBeGreaterThan(0);
+      expect(Number.isInteger(scroller.scrollTop)).toBe(true);
+      frame.mockRestore();
+    });
+  });
+
+  describe('when the page or the pointer lets it down', () => {
+    it('sends the item home and ends the drag when the page cannot commit the drop', async () => {
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
+      const reported = vi.fn();
+      (window as unknown as { reportError: unknown }).reportError = reported;
+      const refusals: Array<() => never | Promise<never>> = [
+        () => { throw new Error('The save was refused'); },
+        () => Promise.reject(new Error('The save was refused later')),
+      ];
+      for (const refuse of refusals) {
+        sortable.destroy();
+        document.body.replaceChildren();
+        ended.length = 0;
+        sortable = createSortable({ prepareDrop: refuse, onDragEnd: result => ended.push(result) });
+        const a = column('a', 0, 3);
+        register(sortable, a, 'a');
+        pointer('pointerdown', a.cells[0], 10, 10);
+        pointer('pointermove', window, 10, 35);
+        pointer('pointerup', window, 10, 35);
+        await vi.runAllTimersAsync();
+        expect(sortable.isDragging()).toBe(false);
+        expect(ended).toEqual([expect.objectContaining({ destination: null, reason: 'CANCEL' })]);
+        expect(document.querySelector('[data-drag-overlay]')).toBeNull();
+        expect(document.documentElement.hasAttribute('data-drag-active')).toBe(false);
+        expect(a.cells[0].style.visibility).toBe('');
+        expect(a.cells[1].style.translate).toBe('');
+        // The next press is the page's again.
+        pointer('pointerdown', a.cells[1], 10, 30);
+        pointer('pointermove', window, 10, 60);
+        expect(sortable.isDragging()).toBe(true);
+        sortable.cancel();
+        await vi.runAllTimersAsync();
+      }
+      expect(reported.mock.calls.map(([error]) => (error as Error).message)).toEqual(['The save was refused', 'The save was refused later']);
+      delete (window as unknown as { reportError?: unknown }).reportError;
+    });
+
+    it('ends a press and a carry whose release it never saw', () => {
+      const a = column('a', 0, 3);
+      register(sortable, a, 'a');
+      // Pressed, then the mouse comes back with no button down: it was let go elsewhere.
+      pointer('pointerdown', a.cells[0], 10, 10, 'mouse', 1);
+      pointer('pointermove', window, 10, 30, 'mouse', 0);
+      pointer('pointermove', window, 10, 60, 'mouse', 0);
+      expect(sortable.isDragging()).toBe(false);
+      // Carried, then the same: it goes home rather than follow a pointer nobody is holding.
+      pointer('pointerdown', a.cells[0], 10, 10, 'mouse', 1);
+      pointer('pointermove', window, 10, 40, 'mouse', 1);
+      expect(sortable.isDragging()).toBe(true);
+      pointer('pointermove', window, 10, 90, 'mouse', 0);
+      vi.runAllTimers();
+      expect(sortable.isDragging()).toBe(false);
+      expect(ended).toEqual([expect.objectContaining({ destination: null, reason: 'CANCEL' })]);
+      expect(a.cells[1].style.translate).toBe('');
+    });
+
+    it('lands at once when pressed during the landing, and takes the new press', () => {
+      const a = column('a', 0, 3);
+      register(sortable, a, 'a');
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 10, 40);
+      pointer('pointerup', window, 10, 40);
+      // Still on its way to its slot.
+      expect(ended).toHaveLength(0);
+      pointer('pointerdown', a.cells[2], 10, 50);
+      expect(ended).toEqual([expect.objectContaining({ draggableId: 'a0', reason: 'DROP' })]);
+      expect(document.querySelector('[data-drag-overlay]')).toBeNull();
+      pointer('pointermove', window, 10, 20);
+      expect(sortable.isDragging()).toBe(true);
+      expect(a.cells[2].hasAttribute('data-drag-source')).toBe(true);
+      pointer('pointerup', window, 10, 20);
+      vi.runAllTimers();
+      expect(ended).toHaveLength(2);
+    });
+
+    it('swallows the click of the release that follows a cancel', () => {
+      const a = column('a', 0, 3);
+      register(sortable, a, 'a');
+      const clicked = vi.fn();
+      const click = () => a.cells[1].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      // Nothing an earlier test left waiting for a click is counted here.
+      vi.runAllTimers();
+      click();
+      document.body.addEventListener('click', clicked);
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 10, 40);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      vi.runAllTimers();
+      expect(ended).toHaveLength(1);
+      // The button is still down; letting go is the end of the cancelled drag, not a press on the page.
+      pointer('pointerup', window, 10, 40);
+      click();
+      expect(clicked).not.toHaveBeenCalled();
+      vi.runAllTimers();
+      click();
+      expect(clicked).toHaveBeenCalledTimes(1);
+      document.body.removeEventListener('click', clicked);
+    });
+
+    it('lets a new press through when the release after a cancel never came', () => {
+      const a = column('a', 0, 3);
+      register(sortable, a, 'a');
+      const clicked = vi.fn();
+      document.body.addEventListener('click', clicked);
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 10, 40);
+      window.dispatchEvent(new Event('blur'));
+      vi.runAllTimers();
+      pointer('pointerdown', a.cells[1], 10, 30);
+      pointer('pointerup', window, 10, 30);
+      a.cells[1].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      expect(clicked).toHaveBeenCalledTimes(1);
+      document.body.removeEventListener('click', clicked);
+    });
+  });
+
   describe('with the keyboard', () => {
     const key = (target: EventTarget, name: string) =>
       target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }));
@@ -870,6 +1263,18 @@ describe('createSortable', () => {
       vi.runAllTimers();
       expect(ended[0]).toEqual(expect.objectContaining({ reason: 'CANCEL', destination: null }));
       expect(spoken()).toBe('a0 is back at position 1 of 3 in a.');
+    });
+
+    it('puts the item back when a pointer is pressed while the keyboard carries it', () => {
+      const a = column('a', 0, 3);
+      register(sortable, a, 'a');
+      key(a.cells[0], ' ');
+      key(document.body, 'ArrowDown');
+      pointer('pointerdown', a.cells[2], 10, 50);
+      vi.runAllTimers();
+      expect(sortable.isDragging()).toBe(false);
+      expect(ended).toEqual([expect.objectContaining({ mode: 'SNAP', destination: null, reason: 'CANCEL' })]);
+      expect(a.cells[1].style.translate).toBe('');
     });
 
     it('leaves space alone in a field inside the item', () => {

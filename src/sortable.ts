@@ -166,6 +166,12 @@ export type SortableOptions = {
   inheritProperties?: string[];
   /** The element drawn under the pointer; a clone of the item by default. */
   renderPreview?: (source: HTMLElement) => HTMLElement;
+  /**
+   * The page's last word on the element drawn under the pointer, before it is
+   * shown: take off what belongs to its own editing (a selection mark the
+   * clone copied) or add to it (a count). The item itself is left alone.
+   */
+  onPreview?: (preview: HTMLElement, source: HTMLElement) => void;
   /** Announcements and the keyboard instructions; English by default. */
   messages?: Partial<SortableMessages>;
   /**
@@ -225,13 +231,17 @@ const defaults = {
 
 /** The drop: the longest duration is reached at this distance. */
 const maxDropDistance = 1500;
+/** The fastest edge scroll, in pixels for each sixtieth of a second: the same on a 60Hz and a 120Hz screen. */
 const maxScrollSpeed = 24;
+const scrollFrame = 1000 / 60;
+/** How far towards an edge a pointer that lifted inside its band moves before that edge scrolls. */
+const scrollIntent = 10;
 const inheritedText = ['color', 'font', 'letter-spacing', 'line-height', '-webkit-font-smoothing'];
 const interactive = 'input, textarea, select, option, button, a[href], [contenteditable]:not([contenteditable="false"])';
 const handleStyleId = 'data-0001-drag-sortable-style';
 const handleStyles = `
 [data-drag-handle]:not([data-drag-handle="text"]){-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;cursor:grab;touch-action:manipulation}
-:root[data-drag-active],:root[data-drag-active] *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important}
+:root[data-drag-active],:root[data-drag-active] *{-webkit-user-select:none!important;user-select:none!important;cursor:grabbing!important;overflow-anchor:none!important}
 `;
 
 type ContainerRegistration = Required<Omit<SortableContainerArgs, 'isDropDisabled' | 'isCombineEnabled' | 'label' | 'lockAxis' | 'renderPreview' | 'hitArea'>> & {
@@ -323,9 +333,18 @@ type Session = {
   sourceVisibility: string;
   reserved: ContainerSnapshot | null;
   scrollFrame: number | null;
+  /** When the last edge-scroll step ran, and the part of a pixel each scroller is still owed. */
+  scrollTime: number | null;
+  scrollOwed: Map<object, { x: number; y: number }>;
+  /** The edges that may scroll, by scroller: one the item lifted inside waits for the pointer to mean it. */
+  scrollArmed: Map<object, { left: boolean; right: boolean; top: boolean; bottom: boolean }>;
   impactFrame: number | null;
   dropping: boolean;
   preparing?: boolean;
+  /** Ends the landing now: a press during it is not kept waiting. */
+  land?: () => void;
+  /** Where the commit drew each sibling, and how far the page had scrolled then: nothing moves from there. */
+  committed?: { boxes: Map<HTMLElement, Box>; scrollX: number; scrollY: number };
   landing?: { element: HTMLElement; visibility: string };
   /** The sibling the lifted item is held over, to combine with; the gap stays as it was. */
   combine: { container: ContainerSnapshot; slot: Slot } | null;
@@ -355,6 +374,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   /** Siblings still settling from the last drop: a new lift finishes them before it measures. */
   const settling = new Set<Animation>();
   let liveRegion: HTMLElement | null = null;
+  /** Forgets the release still owed by a pointer whose drag was cancelled while it was down. */
+  let forgetRelease: (() => void) | null = null;
 
   function container(args: SortableContainerArgs): Cleanup {
     const registration: ContainerRegistration = {
@@ -485,7 +506,17 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   }
 
   function onPointerDown(event: PointerEvent): void {
-    if (destroyed || session || pending) return;
+    if (destroyed) return;
+    // A new press: the release a cancelled drag was owed never came, or has been dealt with.
+    forgetRelease?.();
+    // A press while the last drop is still landing is not kept waiting: the drop lands now.
+    if (session?.dropping && !pending) session.land?.();
+    // A press while the keyboard carries an item puts it back: the pointer has taken over.
+    if (session && session.mode === 'SNAP' && !session.dropping) {
+      void drop('CANCEL');
+      return;
+    }
+    if (session || pending) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const registration = findHandle(event.target);
     const target = eventElement(event.target);
@@ -511,6 +542,13 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   }
 
   function onPointerMove(event: PointerEvent): void {
+    // A mouse moving with no button down was released where the page could not see it
+    // (over another window, behind a dialog): the press is over, and a carried item goes home.
+    if (event.pointerType === 'mouse' && event.buttons === 0) {
+      if (pending && event.pointerId === pending.pointerId) clearPending();
+      else if (session && session.mode === 'FLUID' && event.pointerId === session.pointerId && !session.dropping) void drop('CANCEL');
+      return;
+    }
     if (pending && event.pointerId === pending.pointerId) {
       const point = pointOf(event);
       const distance = Math.hypot(point.x - pending.startX, point.y - pending.startY);
@@ -651,8 +689,27 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (!session) removeWindowListeners();
   }
 
-  function suppressClick(): void {
-    const view = session?.overlay.ownerDocument.defaultView ?? eventView ?? window;
+  /**
+   * A drag cancelled while its pointer is down (Escape, a lost window) still has a release to
+   * come, and the click that follows it would press whatever lies under the pointer.
+   */
+  function swallowRelease(view: Window, pointerId: number): void {
+    forgetRelease?.();
+    const released = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      forgetRelease?.();
+      if (event.type === 'pointerup') suppressClick(view);
+    };
+    view.addEventListener('pointerup', released, true);
+    view.addEventListener('pointercancel', released, true);
+    forgetRelease = () => {
+      forgetRelease = null;
+      view.removeEventListener('pointerup', released, true);
+      view.removeEventListener('pointercancel', released, true);
+    };
+  }
+
+  function suppressClick(view: Window = session?.overlay.ownerDocument.defaultView ?? eventView ?? window): void {
     const stop = (event: Event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -781,7 +838,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     }
 
     const customPreview = home.registration.renderPreview?.(registration.element) ?? options.renderPreview?.(registration.element);
-    const preview = customPreview ?? cloneForPreview(registration.element);
+    const copied = customPreview ? null : cloneForPreview(registration.element);
+    const preview = customPreview ?? copied!.clone;
     for (const property of customPreview ? inheritedText : []) {
       preview.style.setProperty(property, sourceStyle.getPropertyValue(property));
     }
@@ -804,7 +862,13 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       pointerEvents: 'none',
     });
     overlay.appendChild(preview);
+    options.onPreview?.(preview, registration.element);
     document.body.appendChild(overlay);
+    // What had scrolled inside the item stands where it stood: a clone starts at nought.
+    for (const [copy, left, top] of copied?.scrolled ?? []) {
+      copy.scrollLeft = left;
+      copy.scrollTop = top;
+    }
 
     const element = registration.element;
     session = {
@@ -829,6 +893,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       sourceVisibility: element.style.visibility,
       reserved: null,
       scrollFrame: null,
+      scrollTime: null,
+      scrollOwed: new Map(),
+      scrollArmed: new Map(),
       impactFrame: null,
       dropping: false,
       combine: null,
@@ -1166,56 +1233,80 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (current.scrollFrame !== null) return;
     const view = current.overlay.ownerDocument.defaultView;
     if (!view) return;
-    const step = () => {
+    const step = (time: number) => {
       if (session !== current || current.dropping) return;
       current.scrollFrame = null;
-      if (autoScroll(current)) {
+      // By the clock, not the frame: a 120Hz screen scrolls as far in a second as a 60Hz one.
+      const elapsed = current.scrollTime === null ? scrollFrame : time - current.scrollTime;
+      current.scrollTime = time;
+      if (autoScroll(current, Math.min(2, Math.max(0.25, elapsed / scrollFrame)))) {
         updateImpact(current);
         current.scrollFrame = view.requestAnimationFrame(step);
+      } else {
+        current.scrollTime = null;
       }
     };
     current.scrollFrame = view.requestAnimationFrame(step);
   }
 
-  function autoScroll(current: Session): boolean {
+  /** Scrolls what the pointer is at the edge of, for `frames` sixtieths of a second; whether there is more to scroll. */
+  function autoScroll(current: Session, frames: number): boolean {
     const view = current.overlay.ownerDocument.defaultView;
     if (!view) return false;
-    let movedX = false, movedY = false;
+    // An axis belongs to the innermost scroller that wants it; `moved` says something scrolled or is about to.
+    let takenX = false, takenY = false, moved = false;
+    const scroll = (key: object, speed: { x: number; y: number }, by: (x: number, y: number) => void, at: () => { x: number; y: number }) => {
+      const x = takenX ? 0 : speed.x, y = takenY ? 0 : speed.y;
+      const owed = current.scrollOwed.get(key) ?? { x: 0, y: 0 };
+      current.scrollOwed.set(key, owed);
+      owed.x = x ? owed.x + x * frames : 0;
+      owed.y = y ? owed.y + y * frames : 0;
+      if (!x && !y) return;
+      // Whole pixels are scrolled; the rest is owed to the next frame, so a slow scroll still moves.
+      const stepX = Math.trunc(owed.x), stepY = Math.trunc(owed.y);
+      owed.x -= stepX;
+      owed.y -= stepY;
+      const before = at();
+      if (stepX || stepY) by(stepX, stepY);
+      const after = at();
+      const wentX = stepX ? after.x !== before.x : !!x, wentY = stepY ? after.y !== before.y : !!y;
+      takenX ||= wentX;
+      takenY ||= wentY;
+      moved ||= wentX || wentY;
+    };
     const scrollers = current.destination?.container.scrollers ?? current.home.scrollers;
     for (const { element } of scrollers) {
       const box = measure(element);
       // Across a gutter, keep scrolling the shared ancestor under the pointer.
       if (!contains(box, current.lastX, current.lastY)) continue;
-      const speed = edgeSpeed(current, box);
-      const x = movedX ? 0 : speed.x, y = movedY ? 0 : speed.y;
-      if (!x && !y) continue;
-      const before = { left: element.scrollLeft, top: element.scrollTop };
-      element.scrollBy(x, y);
-      movedX ||= element.scrollLeft !== before.left;
-      movedY ||= element.scrollTop !== before.top;
-      if (movedX && movedY) return true;
+      scroll(element, edgeSpeed(current, element, box), (x, y) => element.scrollBy(x, y), () => ({ x: element.scrollLeft, y: element.scrollTop }));
+      if (takenX && takenY) return true;
     }
-    const page = edgeSpeed(current, { left: 0, top: 0, width: view.innerWidth, height: view.innerHeight });
-    const x = movedX ? 0 : page.x, y = movedY ? 0 : page.y;
-    if (!x && !y) return movedX || movedY;
-    const before = { x: view.scrollX, y: view.scrollY };
-    view.scrollBy(x, y);
-    return movedX || movedY || view.scrollX !== before.x || view.scrollY !== before.y;
+    const page = { left: 0, top: 0, width: view.innerWidth, height: view.innerHeight };
+    scroll(view, edgeSpeed(current, view, page), (x, y) => view.scrollBy(x, y), () => ({ x: view.scrollX, y: view.scrollY }));
+    return moved;
   }
 
-  function edgeSpeed(current: Session, box: Box): { x: number; y: number } {
-    const along = (position: number, start: number, length: number) => {
+  /** How fast the pointer scrolls a scroller from where it is in it, in pixels for each sixtieth of a second. */
+  function edgeSpeed(current: Session, key: object, box: Box): { x: number; y: number } {
+    const armed = current.scrollArmed.get(key) ?? { left: false, right: false, top: false, bottom: false };
+    current.scrollArmed.set(key, armed);
+    const along = (position: number, lifted: number, start: number, length: number, before: 'left' | 'top', after: 'right' | 'bottom') => {
       // The band is at most a fifth of what is visible: a short list on a phone keeps a middle that holds still.
       const edge = Math.min(settings.autoScrollEdge, length / 5);
       if (edge <= 0) return 0;
       const fromStart = position - start;
       const fromEnd = start + length - position;
-      if (fromStart < edge) return -maxScrollSpeed * ((edge - Math.max(fromStart, 0)) / edge) ** 2;
-      if (fromEnd < edge) return maxScrollSpeed * ((edge - Math.max(fromEnd, 0)) / edge) ** 2;
+      // An item lifted inside a band has not asked to scroll: that edge waits until the pointer has
+      // left the band, or has gone on towards the edge, so a block picked up at the foot of the page stays put.
+      if (fromStart >= edge || position <= lifted - scrollIntent) armed[before] = true;
+      if (fromEnd >= edge || position >= lifted + scrollIntent) armed[after] = true;
+      if (fromStart < edge) return armed[before] ? -maxScrollSpeed * ((edge - Math.max(fromStart, 0)) / edge) ** 2 : 0;
+      if (fromEnd < edge) return armed[after] ? maxScrollSpeed * ((edge - Math.max(fromEnd, 0)) / edge) ** 2 : 0;
       return 0;
     };
-    const x = along(current.lastX, box.left, box.width);
-    const y = along(current.lastY, box.top, box.height);
+    const x = along(current.lastX, current.startX, box.left, box.width, 'left', 'right');
+    const y = along(current.lastY, current.startY, box.top, box.height, 'top', 'bottom');
     return { x, y };
   }
 
@@ -1251,11 +1342,14 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         finished = true;
         finish(current, result);
       };
+      current.land = done;
       current.preview.addEventListener('transitionend', done, { once: true });
       setTimeout(done, maxDuration + 50);
       return;
     }
     setCombine(current, null);
+    // Cancelled with its pointer still down: the release to come is the end of this drag, not a click.
+    if (reason === 'CANCEL' && current.mode === 'FLUID') swallowRelease(view, current.pointerId);
 
     // A cancel, or a drop outside every list, sends the item home.
     // A product may take an item dropped outside every list, where it lies.
@@ -1273,6 +1367,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     }
 
     let finalElement: HTMLElement | null = null;
+    let finalBox: DOMRect | null = null;
     if (reason === 'DROP' && options.prepareDrop) {
       current.preparing = true;
       // Preserve the visual positions while the adapter commits the actual final structure.
@@ -1282,39 +1377,59 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       for (const [element, saved] of current.shifts) { element.style.transition = 'none'; element.style.translate = saved.translate; }
       // The committed item takes the room a foreign list reserved for it: the reserve goes as the commit lands.
       current.reserved?.registration.element.style.removeProperty('--drag-reserve');
-      const prepared = options.prepareDrop({ ...startOf(current), destination: returning ? null : locationOf(current.destination!), combine: null, reason });
-      const resolved = promiseLike(prepared) ? await prepared : prepared;
-      const locate = typeof resolved === 'function' ? resolved : () => resolved;
-      finalElement = locate();
-      if (session !== current) return;
-      if (finalElement?.isConnected) {
-        current.landing = { element: finalElement, visibility: finalElement.style.visibility };
-        finalElement.style.visibility = 'hidden';
+      try {
+        const prepared = options.prepareDrop({ ...startOf(current), destination: returning ? null : locationOf(current.destination!), combine: null, reason });
+        const resolved = promiseLike(prepared) ? await prepared : prepared;
+        const locate = typeof resolved === 'function' ? resolved : () => resolved;
+        finalElement = locate();
+        if (session !== current) return;
+        if (finalElement?.isConnected) {
+          current.landing = { element: finalElement, visibility: finalElement.style.visibility };
+          finalElement.style.visibility = 'hidden';
+        }
+        await new Promise<void>(resolve => (current.overlay.ownerDocument.defaultView ?? window).requestAnimationFrame(() => resolve()));
+        if (session !== current) return;
+        const updated = locate();
+        if (updated !== finalElement) {
+          if (current.landing) current.landing.element.style.visibility = current.landing.visibility;
+          finalElement = updated;
+          if (finalElement?.isConnected) { current.landing = { element: finalElement, visibility: finalElement.style.visibility }; finalElement.style.visibility = 'hidden'; }
+        }
+      } catch (error) {
+        // The page could not commit the drop. Nothing stays lifted: the drag ends here as a cancel,
+        // the page is handed back as it now stands, and the failure is the page's to hear.
+        if (session === current) finish(current, { ...startOf(current), destination: null, combine: null, reason: 'CANCEL' });
+        reportFailure(view, error);
+        return;
       }
-      await new Promise<void>(resolve => (current.overlay.ownerDocument.defaultView ?? window).requestAnimationFrame(() => resolve()));
-      if (session !== current) return;
-      const updated = locate();
-      if (updated !== finalElement) {
-        if (current.landing) current.landing.element.style.visibility = current.landing.visibility;
-        finalElement = updated;
-        if (finalElement?.isConnected) { current.landing = { element: finalElement, visibility: finalElement.style.visibility }; finalElement.style.visibility = 'hidden'; }
-      }
+      // Everything is measured where the commit drew it before anything is set sliding: the landing is where the
+      // item rests, not where a sibling still on its way happens to hold it, and a sibling is told how far it
+      // stands from its own place, not its list's.
+      finalBox = finalElement?.isConnected ? finalElement.getBoundingClientRect() : null;
+      const displaced = new Map<HTMLElement, { x: number; y: number }>();
+      current.committed = { boxes: new Map(), scrollX: view.scrollX, scrollY: view.scrollY };
       for (const element of siblings) {
         if (!element.isConnected || element === finalElement) continue;
         const old = before.get(element)!, next = element.getBoundingClientRect();
         reportDrop(element, resting.get(element)!, next);
-        const x = old.left - next.left, y = old.top - next.top;
-        if (!reducedMotion && (x || y)) {
-          const animation = element.animate([{ translate: `${x}px ${y}px` }, { translate: (element.ownerDocument.defaultView ?? window).getComputedStyle(element).translate }], { duration: settings.outOfTheWay.duration, easing: settings.outOfTheWay.easing });
-          // A page without the Web Animations API gives nothing back; there is nothing to finish then.
-          if (!animation) continue;
-          settling.add(animation);
-          animation.addEventListener?.('finish', () => settling.delete(animation));
-          animation.addEventListener?.('cancel', () => settling.delete(animation));
-        }
+        displaced.set(element, { x: old.left - next.left, y: old.top - next.top });
+        current.committed.boxes.set(element, { left: next.left, top: next.top, width: next.width, height: next.height });
+      }
+      for (const [element, from] of reducedMotion ? [] : displaced) {
+        // A list that slides carries its items with it: an item slides only as far as it stands off from that.
+        let holder = element.parentElement;
+        while (holder && !displaced.has(holder)) holder = holder.parentElement;
+        const carried = holder ? displaced.get(holder)! : { x: 0, y: 0 };
+        const x = from.x - carried.x, y = from.y - carried.y;
+        if (Math.abs(x) < 0.01 && Math.abs(y) < 0.01) continue;
+        const animation = element.animate([{ translate: `${x}px ${y}px` }, { translate: (element.ownerDocument.defaultView ?? window).getComputedStyle(element).translate }], { duration: settings.outOfTheWay.duration, easing: settings.outOfTheWay.easing });
+        // A page without the Web Animations API gives nothing back; there is nothing to finish then.
+        if (!animation) continue;
+        settling.add(animation);
+        animation.addEventListener?.('finish', () => settling.delete(animation));
+        animation.addEventListener?.('cancel', () => settling.delete(animation));
       }
     }
-    const finalBox = finalElement?.isConnected ? finalElement.getBoundingClientRect() : null;
     const target = finalBox ? { x: finalBox.left - current.liftBox.left, y: finalBox.top - current.liftBox.top } : targetPosition(current);
     const from = parseTranslate(current.preview.style.transform);
     const distance = Math.hypot(target.x - from.x, target.y - from.y);
@@ -1342,6 +1457,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       finished = true;
       finish(current, result);
     };
+    current.land = done;
     current.preview.addEventListener('transitionend', done, { once: true });
     setTimeout(done, duration + 50);
   }
@@ -1415,9 +1531,23 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     } finally {
       cleanup(current);
     }
+    const view = current.overlay.ownerDocument.defaultView ?? window;
     if (siblings.length) {
-      (current.overlay.ownerDocument.defaultView ?? window).requestAnimationFrame(() => {
+      view.requestAnimationFrame(() => {
         for (const element of siblings) if (element.isConnected) reportDrop(element, resting.get(element)!, element.getBoundingClientRect());
+      });
+    }
+    // A prepared drop was measured as it was committed. Whatever the page has moved since, through the
+    // landing and its own drawing after it, is a second movement too.
+    const committed = options.onMovement ? current.committed : undefined;
+    if (committed) {
+      view.requestAnimationFrame(() => {
+        const scrolledX = view.scrollX - committed.scrollX, scrolledY = view.scrollY - committed.scrollY;
+        for (const [element, box] of committed.boxes) {
+          if (!element.isConnected) continue;
+          const now = restingBox(element, current.shifts);
+          reportDrop(element, box, { ...now, left: now.left + scrolledX, top: now.top + scrolledY });
+        }
       });
     }
     if (result.combine && current.combine) announce(messages.combined(current.item.label(), current.combine.slot.item.label()));
@@ -1439,7 +1569,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   }
 
   function restingBoxes(current: Session, elements: HTMLElement[]): Map<HTMLElement, Box> {
-    return new Map(elements.map((element) => [element, restingBox(element, current.shifts.get(element)?.scale ?? 1)]));
+    return new Map(elements.map((element) => [element, restingBox(element, current.shifts)]));
   }
 
   /** A sibling drawn more than a pixel from where it had made room has moved a second time. */
@@ -1543,6 +1673,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     destroy: () => {
       destroyed = true;
       clearPending();
+      forgetRelease?.();
       // A prepared layout may destroy its old editor while replacing columns.
       // The landing overlay owns its lifetime until the already-started handoff finishes.
       if (session && !session.preparing) cleanup(session);
@@ -1557,6 +1688,13 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       handles.clear();
     },
   };
+}
+
+/** A failure in the page's own code, raised where the page hears its errors, outside the drag that met it. */
+function reportFailure(view: Window, error: unknown): void {
+  const report = (view as Window & { reportError?: (error: unknown) => void }).reportError;
+  if (typeof report === 'function') report.call(view, error);
+  else setTimeout(() => { throw error; });
 }
 
 function promiseLike<T>(value: T | Promise<T>): value is Promise<T> {
@@ -1648,17 +1786,28 @@ function flowOf(style: CSSStyleDeclaration, box: Box, scale: number, vertical: b
   return flowHolds(items, flow, origin) ? { items, source, flow, origin } : null;
 }
 
-/** Where an element would stand without the part of its `translate` still on its way: how its slide ends. */
-function restingBox(element: HTMLElement, scale: number): Box {
+/**
+ * Where an element would stand once every slide still on its way has ended: its own, and that of
+ * anything it stands in that is itself still sliding.
+ */
+function restingBox(element: HTMLElement, shifts: Map<HTMLElement, { scale: number }>): Box {
   const box = measure(element);
+  const view = element.ownerDocument.defaultView ?? window;
   const pair = (value: string) => {
     if (!value || value === 'none') return { x: 0, y: 0 };
     const [x = '0', y = '0'] = value.trim().split(/\s+/);
     return { x: parsePixels(x), y: parsePixels(y) };
   };
-  const target = pair(element.style.translate);
-  const now = pair((element.ownerDocument.defaultView ?? window).getComputedStyle(element).translate);
-  return { ...box, left: box.left + (target.x - now.x) * scale, top: box.top + (target.y - now.y) * scale };
+  let left = box.left, top = box.top;
+  for (let node: HTMLElement | null = element; node; node = node.parentElement) {
+    // Only what is sliding differs from where it is set to stand: its own slide, or a settling one.
+    const set = node.style.translate, drawn = view.getComputedStyle(node).translate;
+    if (set === drawn || (!set && drawn === 'none')) continue;
+    const target = pair(set), now = pair(drawn), scale = shifts.get(node)?.scale ?? 1;
+    left += (target.x - now.x) * scale;
+    top += (target.y - now.y) * scale;
+  }
+  return { ...box, left, top };
 }
 
 function parsePixels(value: string): number {
@@ -1684,29 +1833,97 @@ function scrollParents(element: HTMLElement): HTMLElement[] {
   return parents;
 }
 
-function cloneForPreview(source: HTMLElement): HTMLElement {
+/** Elements that draw nothing themselves: their appearance is not worth reading. */
+const unstyled = /^(style|script|template|link|meta|title|head)$/;
+
+/**
+ * A copy of the item that looks as it does now, wherever it is put: the overlay has none of the
+ * item's ancestors, so each element's resolved appearance is written onto its copy. Also returns
+ * what had scrolled inside it, to be scrolled again once the copy is in the page.
+ */
+function cloneForPreview(source: HTMLElement): { clone: HTMLElement; scrolled: Array<[Element, number, number]> } {
   const clone = source.cloneNode(true) as HTMLElement;
-  // The overlay no longer has the source's ancestors. Snapshot the resolved
-  // appearance at lift, including descendants whose selectors depend on them.
   const view = source.ownerDocument.defaultView!;
-  const originals = [source, ...source.querySelectorAll<HTMLElement | SVGElement>('*')];
-  const copies = [clone, ...clone.querySelectorAll<HTMLElement | SVGElement>('*')];
-  originals.forEach((element, index) => {
-    const target = copies[index];
-    if (!target.style) return;
-    // A clone copies attributes, not properties: an element drawn from properties (a Lit element) gets them again.
-    const properties = (element.constructor as { elementProperties?: unknown }).elementProperties;
-    if (properties instanceof Map) {
-      for (const name of properties.keys() as Iterable<PropertyKey>) {
-        (target as unknown as Record<PropertyKey, unknown>)[name] = (element as unknown as Record<PropertyKey, unknown>)[name];
+  const scrolled: Array<[Element, number, number]> = [];
+  // A browser computes the same standard properties for every element, so their names are read once;
+  // the custom ones differ, and are only read where they are used.
+  const sourceStyle = view.getComputedStyle(source);
+  const listed = Array.from(sourceStyle).filter((property) => !property.startsWith('--'));
+  // A page that lists only what was declared (a test's DOM) is copied whole, element by element.
+  const standard = listed.length > 100 ? listed : null;
+  // What the item itself resolves each custom property to: inside it, only one that differs is written again.
+  const inherited = new Map<string, string>();
+  /** A canvas is cloned empty: draw what it shows. */
+  const paint = (from: HTMLCanvasElement, to: HTMLCanvasElement) => {
+    try { to.getContext('2d')?.drawImage(from, 0, 0); } catch { /* A canvas that cannot be read stays empty. */ }
+  };
+  const drawsPseudo = (element: Element, pseudo: string) => {
+    const content = view.getComputedStyle(element, pseudo).content;
+    return !!content && content !== 'none' && content !== 'normal';
+  };
+  /** `drawn`: inside a copied shadow tree, which draws itself from its own styles. */
+  const copy = (element: Element, target: Element, drawn = false): void => {
+    const styled = target as HTMLElement | SVGElement;
+    if (drawn) {
+      if (element.scrollLeft || element.scrollTop) scrolled.push([target, element.scrollLeft, element.scrollTop]);
+      if (element.localName === 'canvas') paint(element as HTMLCanvasElement, target as HTMLCanvasElement);
+    } else if (styled.style && !unstyled.test(element.localName)) {
+      // A clone copies attributes, not properties: an element drawn from properties (a Lit element) gets them again.
+      const properties = (element.constructor as { elementProperties?: unknown }).elementProperties;
+      if (properties instanceof Map) {
+        for (const name of properties.keys() as Iterable<PropertyKey>) {
+          (target as unknown as Record<PropertyKey, unknown>)[name] = (element as unknown as Record<PropertyKey, unknown>)[name];
+        }
       }
+      const style = view.getComputedStyle(element);
+      // Nothing inside an element that is not drawn is drawn either.
+      if (element !== source && style.display === 'none') {
+        styled.style.setProperty('display', 'none', 'important');
+        return;
+      }
+      // Standard properties are resolved values, so custom properties matter only where something
+      // still reads them: the item itself, a component drawing its own tree, a pseudo-element.
+      if (!standard || element === source) {
+        for (const property of Array.from(style)) {
+          const value = style.getPropertyValue(property);
+          if (property.startsWith('--')) inherited.set(property, value);
+          styled.style.setProperty(property, value, 'important');
+        }
+      } else {
+        for (const property of standard) styled.style.setProperty(property, style.getPropertyValue(property), 'important');
+        if (element.localName.includes('-') || !!element.shadowRoot || drawsPseudo(element, '::before') || drawsPseudo(element, '::after')) {
+          for (let index = 0; index < style.length; index++) {
+            const property = style[index];
+            if (!property.startsWith('--')) continue;
+            const value = style.getPropertyValue(property);
+            if (inherited.get(property) !== value) styled.style.setProperty(property, value, 'important');
+          }
+        }
+      }
+      target.removeAttribute('contenteditable');
+      if (element.scrollLeft || element.scrollTop) scrolled.push([target, element.scrollLeft, element.scrollTop]);
+      if (element.localName === 'canvas') paint(element as HTMLCanvasElement, target as HTMLCanvasElement);
     }
-    const style = view.getComputedStyle(element);
-    for (const property of Array.from(style)) {
-      target.style.setProperty(property, style.getPropertyValue(property), 'important');
+    // A component this page has no definition for (it was made in another window and adopted here)
+    // never draws itself in the copy: its tree is copied as it stands instead.
+    const shadow = element.shadowRoot;
+    if (shadow && !target.shadowRoot && !view.customElements?.get(element.localName)) {
+      try {
+        const root = target.attachShadow({ mode: 'open' });
+        for (const child of Array.from(shadow.childNodes)) root.appendChild(child.cloneNode(true));
+        if (shadow.adoptedStyleSheets?.length) root.adoptedStyleSheets = [...shadow.adoptedStyleSheets];
+        // Its own styles came with it and its host stands as it stood, so the tree draws itself:
+        // only what a copy never carries (a component inside it, a scroll, a canvas) is seen to.
+        pairs(shadow, root, true);
+      } catch { /* An element that takes no shadow tree keeps its light content. */ }
     }
-    target.removeAttribute('contenteditable');
-  });
+    pairs(element, target, drawn);
+  };
+  const pairs = (from: ParentNode, to: ParentNode, drawn: boolean): void => {
+    const originals = from.children, copies = to.children;
+    for (let index = 0; index < originals.length && index < copies.length; index++) copy(originals[index], copies[index], drawn);
+  };
+  copy(source, clone);
   // Logical insets copied as !important override the overlay's physical left/top.
   // Keep descendant appearance, but let the drag engine own the root's position.
   for (const property of ['inset', 'inset-block', 'inset-inline', 'inset-block-start', 'inset-block-end', 'inset-inline-start', 'inset-inline-end', 'top', 'right', 'bottom', 'left', 'margin-block', 'margin-inline', 'margin-block-start', 'margin-block-end', 'margin-inline-start', 'margin-inline-end']) clone.style.removeProperty(property);
@@ -1716,5 +1933,5 @@ function cloneForPreview(source: HTMLElement): HTMLElement {
   for (const element of clone.querySelectorAll('[id]')) element.removeAttribute('id');
   for (const element of clone.querySelectorAll('[data-drag-handle]')) element.removeAttribute('data-drag-handle');
   clone.removeAttribute('data-drag-handle');
-  return clone;
+  return { clone, scrolled };
 }
