@@ -48,7 +48,7 @@ import { createSortable } from '@0001-labs/drag/sortable';
 | `label` | Item name in announcements; falls back to its accessible label or text. |
 | `canDrag({ input, target })` | Whether the item may lift now. Input is mouse, pen, touch or keyboard. |
 | `allowInteractive` | Allows a press on an interactive descendant to start a drag. Off by default. |
-| `text` | `{ hold: () => milliseconds, axis?: 'x' \| 'y' }` for editable text blocks. |
+| `text` | `{ hold: () => milliseconds, axis?: 'x' \| 'y', carries?: (point) => boolean }` for editable text blocks. `carries` names the points where a press is carrying the item rather than choosing words (a block in a column taken to the next column): there it lifts at once, even after words were chosen on the way. |
 
 Text mode preserves the caret, selection, cursor and keys. It does not add a tab stop or keyboard lifting. A mouse or pen must hold still for the requested duration; movement sooner stays text selection. Setting `axis` allows an initial movement at least twice as far along that axis to lift immediately. Give people another keyboard way to move text blocks.
 
@@ -93,6 +93,7 @@ Indexes start at zero. `FLUID` means pointer movement; `SNAP` means keyboard mov
 | `inheritProperties` | Additional CSS custom properties copied to the preview. |
 | `renderPreview(source)` | Custom preview element instead of the default clone. |
 | `onPreview(preview, source)` | The page's last word on the preview before it is shown: take off what belongs to its own editing (a selection mark the clone copied) or add to it (a count). The item itself is left alone. |
+| `stay(point)` | Whether the item carried to this point is going somewhere the lists do not hold (beside an item, into another column). While it returns true nothing makes room, every item stands where it stood at the lift, and a drop reports the item's own place. Asked at every move and scroll, before anything moves. |
 | `messages` | Partial replacement for instructions and announcement functions. |
 | `pointerPoint(event)` | Custom viewport coordinates; defaults to `clientX` and `clientY`. |
 
@@ -103,6 +104,9 @@ Indexes start at zero. `FLUID` means pointer movement; `SNAP` means keyboard mov
 - **Scroll anchoring is off while an item is carried**, so a commit above or below the fold never scrolls the page under the landing.
 - **The landing is measured before siblings settle.** An item dropped while its list is still sliding lands where it rests, and a list that slides carries its items with it.
 - **A press during the landing lands the drop at once** and is handled as a new press.
+- **Siblings slide from the first frame after a commit**: they are measured and set sliding before the browser paints it, never shown at their new places first.
+- **No menu opens while an item is pressed or carried**, not the browser's and not one the page draws.
+- **An item that paints no background is carried on the colour it stood on**, so the words it passes never show through its own.
 - **A drag always ends.** A mouse that comes back with no button down was released out of sight: the press is dropped and a carried item goes home. A pointer pressed during a keyboard carry puts the item back. After a cancel with the button still down, the click of the release is swallowed.
 
 See [styling](/guides/styling/) for state attributes and [accessibility](/guides/accessibility/) for messages and controls.
