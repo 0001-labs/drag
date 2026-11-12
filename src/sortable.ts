@@ -615,8 +615,11 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (session && event.cancelable) event.preventDefault();
   }
 
+  /** No menu while an item is pressed or carried: not the browser's, and not one the page draws itself. */
   function onContextMenu(event: Event): void {
-    if (pending || session) event.preventDefault();
+    if (!pending && !session) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
   }
 
   /** A pressed or lifted item is the engine's: a native drag, even one WebKit starts from the lifted clone, would take the pointer away. */
@@ -862,6 +865,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       pointerEvents: 'none',
     });
     overlay.appendChild(preview);
+    // An item that paints no background of its own lets what it passes over show through its words:
+    // it is carried on what it stood on, so it covers the page below as it looked where it was.
+    if (!customPreview) standOnBackground(preview, registration.element);
     options.onPreview?.(preview, registration.element);
     document.body.appendChild(overlay);
     // What had scrolled inside the item stands where it stood: a clone starts at nought.
@@ -1831,6 +1837,24 @@ function scrollParents(element: HTMLElement): HTMLElement[] {
     parent = parent.parentElement;
   }
   return parents;
+}
+
+/** Whether a computed style paints nothing behind the element's content. */
+function paintsNoBackground(style: CSSStyleDeclaration): boolean {
+  return (!style.backgroundImage || style.backgroundImage === 'none') && /^(transparent|rgba\([^)]*,\s*0\)|)$/.test(style.backgroundColor.trim());
+}
+
+/** Gives a preview of an item without a background the colour of the nearest ancestor that paints one. */
+function standOnBackground(preview: HTMLElement, source: HTMLElement): void {
+  const view = source.ownerDocument.defaultView;
+  if (!view || !paintsNoBackground(view.getComputedStyle(source))) return;
+  for (let node: Element | null = source.parentElement; node; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) {
+    const style = view.getComputedStyle(node);
+    if (style.backgroundColor && !paintsNoBackground(style)) {
+      preview.style.setProperty('background-color', style.backgroundColor, 'important');
+      return;
+    }
+  }
 }
 
 /** Elements that draw nothing themselves: their appearance is not worth reading. */

@@ -995,6 +995,23 @@ describe('createSortable', () => {
       expect(a.cells[0].querySelector('button')!.style.pointerEvents).toBe('');
     });
 
+    it('carries an item without a background on what it stood on, so the page below stays covered', () => {
+      const a = column('a', 0, 2);
+      a.list.style.backgroundColor = 'rgb(250, 249, 248)';
+      const painted = document.createElement('div');
+      painted.style.backgroundColor = 'rgb(10, 20, 30)';
+      a.cells[1].append(painted);
+      register(sortable, a, 'a');
+      expect(lift(a.cells[0]).style.backgroundColor).toBe('rgb(250, 249, 248)');
+      pointer('pointerup', window, 10, 35);
+      vi.runAllTimers();
+      // One that paints its own keeps it.
+      a.cells[1].style.backgroundColor = 'rgb(200, 0, 0)';
+      pointer('pointerdown', a.cells[1], 10, 30);
+      pointer('pointermove', window, 10, 55);
+      expect(document.querySelector<HTMLElement>('[data-drag-preview]')!.style.backgroundColor).toBe('rgb(200, 0, 0)');
+    });
+
     it('keeps what had scrolled inside the item where it stood', () => {
       const a = column('a', 0, 2);
       const track = document.createElement('div');
@@ -1170,7 +1187,26 @@ describe('createSortable', () => {
       expect(ended).toHaveLength(2);
     });
 
-    it('swallows the click of the release that follows a cancel', () => {
+      it('opens no menu while an item is pressed or carried, not even one the page draws', () => {
+      const a = column('a', 0, 3);
+      register(sortable, a, 'a');
+      const opened = vi.fn();
+      a.list.addEventListener('contextmenu', opened);
+      const menu = () => { const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true }); a.cells[1].dispatchEvent(event); return event.defaultPrevented; };
+      expect(menu()).toBe(false);
+      expect(opened).toHaveBeenCalledTimes(1);
+      pointer('pointerdown', a.cells[0], 10, 10);
+      expect(menu()).toBe(true);
+      pointer('pointermove', window, 10, 40);
+      expect(menu()).toBe(true);
+      expect(opened).toHaveBeenCalledTimes(1);
+      pointer('pointerup', window, 10, 40);
+      vi.runAllTimers();
+      expect(menu()).toBe(false);
+      expect(opened).toHaveBeenCalledTimes(2);
+    });
+
+  it('swallows the click of the release that follows a cancel', () => {
       const a = column('a', 0, 3);
       register(sortable, a, 'a');
       const clicked = vi.fn();
