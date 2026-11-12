@@ -181,6 +181,13 @@ export type SortableOptions = {
    * clone copied) or add to it (a count). The item itself is left alone.
    */
   onPreview?: (preview: HTMLElement, source: HTMLElement) => void;
+  /**
+   * Whether the item carried to this point is going somewhere other than among a list's items: beside one of
+   * them, into another column. While it is, nothing makes room and every item stands where it stood at the
+   * lift, so the page's own mark of that place stays on what it marks; a drop then reports the item's own place.
+   * Asked at every move and scroll, before anything moves.
+   */
+  stay?: (point: { x: number; y: number }) => boolean;
   /** Announcements and the keyboard instructions; English by default. */
   messages?: Partial<SortableMessages>;
   /**
@@ -979,6 +986,22 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const pointerY = current.lastY;
     let over: ContainerSnapshot | null = null;
     let overArea = Infinity;
+
+    // Headed somewhere the lists do not hold: held over its own place, everything as it stood at the lift.
+    if (options.stay?.({ x: pointerX, y: pointerY })) {
+      const uncombined = setCombine(current, null);
+      const previous = current.destination;
+      if (previous?.container === current.home && previous.index === current.sourceIndex) {
+        if (uncombined) options.onDragUpdate?.(updateOf(current));
+        return;
+      }
+      current.destination = { container: current.home, index: current.sourceIndex };
+      applyShifts(current, previous?.container ?? null);
+      current.overlay.ownerDocument.documentElement.toggleAttribute('data-drag-outside', false);
+      options.onDragUpdate?.(updateOf(current));
+      announceMove(current);
+      return;
+    }
 
     for (const snapshot of current.containers) {
       if (snapshot.registration.isDropDisabled()) continue;

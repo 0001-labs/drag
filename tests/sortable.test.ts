@@ -261,6 +261,27 @@ describe('createSortable', () => {
     expect(a.cells[0].style.visibility).toBe('');
   });
 
+  it('holds every item where it stood while the page says the carried one is going elsewhere', () => {
+    sortable.destroy();
+    let beside = false;
+    sortable = createSortable({ stay: () => beside, onDragUpdate: update => updates.push(update.destination), onDragEnd: result => ended.push(result) });
+    const a = column('a', 0, 4);
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 52);
+    expect(a.cells[1].style.translate).toBe('0 -20px');
+    expect(a.cells[2].style.translate).toBe('0 -20px');
+    // Beside an item: everything goes back to where it stood at the lift.
+    beside = true;
+    pointer('pointermove', window, 14, 52);
+    expect(a.cells[1].style.translate).toBe('none');
+    expect(a.cells[2].style.translate).toBe('none');
+    expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 0 });
+    pointer('pointerup', window, 14, 52);
+    vi.runAllTimers();
+    expect(ended[0]).toEqual(expect.objectContaining({ destination: { droppableId: 'a', index: 0 }, reason: 'DROP' }));
+  });
+
   it('reports no destination for a drop outside every list', () => {
     const a = column('a', 0, 3);
     register(sortable, a, 'a');
