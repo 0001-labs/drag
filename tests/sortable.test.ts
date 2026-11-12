@@ -498,6 +498,30 @@ describe('createSortable', () => {
     await vi.runAllTimersAsync();
   });
 
+  it('sets siblings sliding before the commit is painted', async () => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
+    sortable.destroy();
+    const a = column('a', 0, 3);
+    const started: HTMLElement[] = [];
+    Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value(this: HTMLElement) { started.push(this); return { finish: () => {}, addEventListener: () => {} }; } });
+    sortable = createSortable({
+      // The commit draws a2 20px lower than it stood.
+      prepareDrop: () => { stubBox(a.cells[2], 0, 2 * pitch + 20, cellWidth, cellHeight); return a.cells[0]; },
+      onDragEnd: result => ended.push(result),
+    });
+    register(sortable, a, 'a');
+    pointer('pointerdown', a.cells[0], 10, 10);
+    pointer('pointermove', window, 10, 14);
+    pointer('pointermove', window, 10, 16);
+    pointer('pointerup', window, 10, 16);
+    // No frame has passed: the slide is already set, so the browser never paints a2 at its new place first.
+    expect(started).toEqual([a.cells[2]]);
+    await vi.runAllTimersAsync();
+    expect(ended).toHaveLength(1);
+    // @ts-expect-error The test's own animate is removed again.
+    delete HTMLElement.prototype.animate;
+  });
+
   it('lands where the item rests, and slides a list\'s items with their list rather than twice', async () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
     sortable.destroy();
@@ -714,6 +738,35 @@ describe('createSortable', () => {
       pointer('pointerup', window, 11, 52);
       vi.runAllTimers();
       expect(ended[0]).toEqual(expect.objectContaining({ reason: 'DROP', source: { droppableId: 'a', index: 0 }, destination: { droppableId: 'a', index: 2 } }));
+    });
+
+    it('lifts once the press carries it where its words cannot be chosen, even after choosing some', () => {
+      const a = column('a', 0, 3);
+      sortable.container({ element: a.list, id: 'a', type: 'cell' });
+      // As a block in a column: past x 100 stands the next column.
+      a.cells.forEach((cell, index) => sortable.item({ element: cell, id: `a${index}`, type: 'cell', text: { hold: () => 400, axis: 'y', carries: point => point.x > 100 } }));
+      pointer('pointerdown', a.cells[0], 10, 10);
+      // Along the line: words are being chosen.
+      pointer('pointermove', window, 40, 11);
+      pointer('pointermove', window, 70, 11);
+      expect(sortable.isDragging()).toBe(false);
+      // The hold no longer lifts it while words are chosen.
+      vi.advanceTimersByTime(500);
+      expect(sortable.isDragging()).toBe(false);
+      // Into the next column: it is carried.
+      pointer('pointermove', window, 130, 11);
+      expect(sortable.isDragging()).toBe(true);
+      pointer('pointerup', window, 130, 11);
+      vi.runAllTimers();
+      // Without the rule, the same press only chooses words.
+      sortable.destroy();
+      sortable = createSortable();
+      a.cells.forEach((cell, index) => sortable.item({ element: cell, id: `b${index}`, type: 'cell', text: { hold: () => 400, axis: 'y' } }));
+      sortable.container({ element: a.list, id: 'a', type: 'cell' });
+      pointer('pointerdown', a.cells[0], 10, 10);
+      pointer('pointermove', window, 70, 11);
+      pointer('pointermove', window, 130, 11);
+      expect(sortable.isDragging()).toBe(false);
     });
 
     it('lifts at once on a move when its hold is nought', () => {

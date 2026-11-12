@@ -107,7 +107,16 @@ export type SortableItemArgs = {
    * across, lifts at once without the hold: words are selected along a line,
    * so a block moved down a page is told apart from words being selected.
    */
-  text?: { hold: () => number; axis?: 'x' | 'y' };
+  text?: {
+    hold: () => number;
+    axis?: 'x' | 'y';
+    /**
+     * Whether the press, moved to this point before the hold, is carrying the item rather than choosing
+     * words: a block in a column taken to the next column, where no words of its own can be chosen. It lifts
+     * at once there, even if words were being chosen on the way.
+     */
+    carries?: (point: { x: number; y: number }) => boolean;
+  };
 };
 
 /** What an announcement is about. Positions count from one. */
@@ -309,6 +318,8 @@ type Pending = {
   timer: ReturnType<typeof setTimeout> | null;
   /** Waiting for a still press to lift writing; a move first leaves the press to the page. */
   held: boolean;
+  /** Choosing words, and still watched in case the press carries the item after all (`text.carries`). */
+  choosing?: boolean;
 };
 
 type Session = {
@@ -553,14 +564,24 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       const point = pointOf(event);
       const distance = Math.hypot(point.x - pending.startX, point.y - pending.startY);
       if (distance < settings.dragDistance) return;
-      if (pending.pointerType === 'touch' || pending.held) {
+      const carries = pending.pointerType !== 'touch' ? pending.item.text?.carries : undefined;
+      if ((pending.pointerType === 'touch' || pending.held || pending.choosing) && !carries?.(point)) {
+        if (pending.choosing) return;
         // Writing moved along its axis is lifted at once; moved any other way, it selects words.
         const axis = pending.pointerType !== 'touch' ? pending.item.text?.axis : undefined;
         const along = Math.abs(axis === 'x' ? point.x - pending.startX : point.y - pending.startY);
         const across = Math.abs(axis === 'x' ? point.y - pending.startY : point.x - pending.startX);
         if (!axis || along < 2 * across) {
           // It moved before the hold finished: a finger scrolls, a press on writing selects words.
-          clearPending();
+          if (!carries) {
+            clearPending();
+            return;
+          }
+          // Words are being chosen; the press is watched in case it goes on to carry the item.
+          if (pending.timer) clearTimeout(pending.timer);
+          pending.timer = null;
+          pending.held = false;
+          pending.choosing = true;
           return;
         }
       }
@@ -1373,45 +1394,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     }
 
     let finalElement: HTMLElement | null = null;
-    let finalBox: DOMRect | null = null;
-    if (reason === 'DROP' && options.prepareDrop) {
-      current.preparing = true;
-      // Preserve the visual positions while the adapter commits the actual final structure.
-      const siblings = siblingsOf(current);
-      const before = new Map(siblings.map(element => [element, element.getBoundingClientRect()]));
-      const resting = restingBoxes(current, siblings);
-      for (const [element, saved] of current.shifts) { element.style.transition = 'none'; element.style.translate = saved.translate; }
-      // The committed item takes the room a foreign list reserved for it: the reserve goes as the commit lands.
-      current.reserved?.registration.element.style.removeProperty('--drag-reserve');
-      try {
-        const prepared = options.prepareDrop({ ...startOf(current), destination: returning ? null : locationOf(current.destination!), combine: null, reason });
-        const resolved = promiseLike(prepared) ? await prepared : prepared;
-        const locate = typeof resolved === 'function' ? resolved : () => resolved;
-        finalElement = locate();
-        if (session !== current) return;
-        if (finalElement?.isConnected) {
-          current.landing = { element: finalElement, visibility: finalElement.style.visibility };
-          finalElement.style.visibility = 'hidden';
-        }
-        await new Promise<void>(resolve => (current.overlay.ownerDocument.defaultView ?? window).requestAnimationFrame(() => resolve()));
-        if (session !== current) return;
-        const updated = locate();
-        if (updated !== finalElement) {
-          if (current.landing) current.landing.element.style.visibility = current.landing.visibility;
-          finalElement = updated;
-          if (finalElement?.isConnected) { current.landing = { element: finalElement, visibility: finalElement.style.visibility }; finalElement.style.visibility = 'hidden'; }
-        }
-      } catch (error) {
-        // The page could not commit the drop. Nothing stays lifted: the drag ends here as a cancel,
-        // the page is handed back as it now stands, and the failure is the page's to hear.
-        if (session === current) finish(current, { ...startOf(current), destination: null, combine: null, reason: 'CANCEL' });
-        reportFailure(view, error);
-        return;
-      }
-      // Everything is measured where the commit drew it before anything is set sliding: the landing is where the
-      // item rests, not where a sibling still on its way happens to hold it, and a sibling is told how far it
-      // stands from its own place, not its list's.
-      finalBox = finalElement?.isConnected ? finalElement.getBoundingClientRect() : null;
+    let finalBox: Box | null = null;
+    /** Sets each sibling the commit moved sliding from where it stood, and keeps where the commit drew it. */
+    const settle = (siblings: HTMLElement[], before: Map<HTMLElement, DOMRect>, resting: Map<HTMLElement, Box>) => {
       const displaced = new Map<HTMLElement, { x: number; y: number }>();
       current.committed = { boxes: new Map(), scrollX: view.scrollX, scrollY: view.scrollY };
       for (const element of siblings) {
@@ -1434,6 +1419,49 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         settling.add(animation);
         animation.addEventListener?.('finish', () => settling.delete(animation));
         animation.addEventListener?.('cancel', () => settling.delete(animation));
+      }
+    };
+    if (reason === 'DROP' && options.prepareDrop) {
+      current.preparing = true;
+      // Preserve the visual positions while the adapter commits the actual final structure.
+      const siblings = siblingsOf(current);
+      const before = new Map(siblings.map(element => [element, element.getBoundingClientRect()]));
+      const resting = restingBoxes(current, siblings);
+      for (const [element, saved] of current.shifts) { element.style.transition = 'none'; element.style.translate = saved.translate; }
+      // The committed item takes the room a foreign list reserved for it: the reserve goes as the commit lands.
+      current.reserved?.registration.element.style.removeProperty('--drag-reserve');
+      try {
+        const prepared = options.prepareDrop({ ...startOf(current), destination: returning ? null : locationOf(current.destination!), combine: null, reason });
+        const resolved = promiseLike(prepared) ? await prepared : prepared;
+        const locate = typeof resolved === 'function' ? resolved : () => resolved;
+        finalElement = locate();
+        if (session !== current) return;
+        if (finalElement?.isConnected) {
+          current.landing = { element: finalElement, visibility: finalElement.style.visibility };
+          finalElement.style.visibility = 'hidden';
+        }
+        // Everything is measured where the commit drew it, and siblings are set sliding from where they stood,
+        // before the browser paints the commit: otherwise they show at their new places for a frame, jump back
+        // and slide. The landing is where the item rests, not where a sibling still on its way holds it, and a
+        // sibling is told how far it stands from its own place, not its list's.
+        finalBox = finalElement?.isConnected ? measure(finalElement) : null;
+        settle(siblings, before, resting);
+        await new Promise<void>(resolve => (current.overlay.ownerDocument.defaultView ?? window).requestAnimationFrame(() => resolve()));
+        if (session !== current) return;
+        // A page that draws the commit a frame later names its element now.
+        const updated = locate();
+        if (updated !== finalElement) {
+          if (current.landing) current.landing.element.style.visibility = current.landing.visibility;
+          finalElement = updated;
+          if (finalElement?.isConnected) { current.landing = { element: finalElement, visibility: finalElement.style.visibility }; finalElement.style.visibility = 'hidden'; }
+          finalBox = finalElement?.isConnected ? restingBox(finalElement, current.shifts) : null;
+        }
+      } catch (error) {
+        // The page could not commit the drop. Nothing stays lifted: the drag ends here as a cancel,
+        // the page is handed back as it now stands, and the failure is the page's to hear.
+        if (session === current) finish(current, { ...startOf(current), destination: null, combine: null, reason: 'CANCEL' });
+        reportFailure(view, error);
+        return;
       }
     }
     const target = finalBox ? { x: finalBox.left - current.liftBox.left, y: finalBox.top - current.liftBox.top } : targetPosition(current);
