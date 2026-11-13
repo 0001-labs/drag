@@ -3,7 +3,7 @@ const { hasSidebar = Astro.locals.starlightRoute.hasSidebar, resizeKey = 'docs-s
 ---
 <div class="docs-frame">
   <slot name="header" />
-  <ds-page class="docs-page" layout={hasSidebar ? 'sidebar' : 'column'} nav-width="8" resizable={hasSidebar} resize-key={resizeKey} divided={hasSidebar} fill drawer={hasSidebar}>
+  <ds-page class="docs-page" layout={hasSidebar ? 'sidebar' : 'column'} nav-width="12" resizable={hasSidebar} resize-key={resizeKey} divided={hasSidebar} fill drawer={hasSidebar}>
     {hasSidebar && <div {...{ slot: 'nav' }} class="docs-navigation"><slot name="sidebar" /></div>}
     <div class="docs-content"><slot /></div>
   </ds-page>

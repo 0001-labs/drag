@@ -1,6 +1,6 @@
 {
   "source": "Design system 1/DS1",
-  "commit": "5ee8b8f54520e85865fa06ba59777256330789ac",
+  "commit": "10aa01b72336a968a1fa63b548d4727ad7689963",
   "components": [
     "header",
     "page",
@@ -18,7 +18,7 @@
     "0-face/languages.ts": "96a7bca8acd7e9832d39c58d21f210fe6999731480a526374bcb6721c124987b",
     "0-face/shared-words.ts": "bf72ad8e6df18b13049a20e31d054108c682bd40b16fc3165a9131edcaa5240a",
     "0-face/sidebar.ts": "68e031f059b08689c24dad319d29def0ebdccc37e2c3d1b1b112b2747498dedc",
-    "0-face/text-contrast.ts": "c64f4b947ce0d8c10734f7c25a99058e3962e2f440dc4f319313056984bca360",
+    "0-face/text-contrast.ts": "6908d51a739d7a5421c6ecac2ba692d157f924eca7eda451fbd6e668ee952c73",
     "0-face/tooltips.ts": "22153475df1e0773040dabc824a9966698ba25ea2c30911b976fff2ccad5bc57",
     "0-face/translations-format.ts": "56d5dbaf2ff792c6139ab1587ab5e3d473de5ebf0bdac7463cae7d7bd3e1b4b5",
     "0-face/translations/da.json": "c0ed2f5e8b0b3f763bda13d03cad291ee0c30728138bf7e9a57c3925819b32f2",
@@ -71,7 +71,7 @@
     "3-unit/ds-sidebar.ts": "85a00b47382b9d1ee8f7985d4b3f8d39f53e611f6591d5f193701beb302a6db0",
     "3-unit/styles/ds-row.css": "ea0ce345e731ca9c2fc986d85c4f2a0e754ad63d3c8b31e563d0a2a22546103c",
     "3-unit/styles/ds-sidebar.css": "4385fdba0d8292952338d62e195874a978cb5654eb752a8690a6e4cf207c899f",
-    "4-page/ds-header.ts": "bf317f89e3f5561f98f2e73471706f01a072e1d70ea3b64fa9b4c109ed4a95cc",
+    "4-page/ds-header.ts": "6981a5dc29bd64c2de8628b0c7352f7e210c2bd0c4997382347203077ad16961",
     "4-page/ds-page.ts": "b631b2c23235836cf78403ff57907ea34bcdeefb8604564d3158b181c6f7b46a",
     "4-page/styles/ds-header.css": "16778aac36df094f4db6cc1b1148698a15aae037a3e7f2f2ebe320bac2021d10",
     "4-page/styles/ds-page.css": "ebff12a02bdeadda4f9830ac575b29d2945f55dccd0afddb7c80704a247154f0",

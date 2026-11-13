@@ -16,6 +16,8 @@ import styles from "./styles/ds-header.css?inline";
 /** The shared word that names the menu button and its drawer. */
 export const MENU_LABEL = "Menu";
 
+const isElement = (node: Node): node is Element => node.nodeType === Node.ELEMENT_NODE;
+
 /**
  * @element ds-header
  * @prop {string} brand - The site's name, a link home: a translation key, or
@@ -124,15 +126,19 @@ export class Header extends LitElement {
     return this.literal ? value : getText(value) || value;
   }
 
-  /** Light-DOM children that fill a slot: elements, or text that is not blank. */
+  /**
+   * Light-DOM children that fill a slot: elements, or text that is not blank.
+   * Children are told apart by node type and tag, never `instanceof`: a page
+   * drawn inside a frame by its parent holds elements of both windows.
+   */
   private slotted(name: string): boolean {
     return [...this.childNodes].some(node => name
-      ? node instanceof Element && node.getAttribute("slot") === name
-      : node instanceof Element ? !node.hasAttribute("slot") : node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()));
+      ? isElement(node) && node.getAttribute("slot") === name
+      : isElement(node) ? !node.hasAttribute("slot") : node.nodeType === Node.TEXT_NODE && Boolean(node.textContent?.trim()));
   }
 
   private links(): HTMLAnchorElement[] {
-    return [...this.children].filter((child): child is HTMLAnchorElement => child instanceof HTMLAnchorElement && !child.hasAttribute("slot"));
+    return [...this.children].filter((child): child is HTMLAnchorElement => child.localName === "a" && !child.hasAttribute("slot"));
   }
 
   private onNavChange = () => {

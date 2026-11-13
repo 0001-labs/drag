@@ -3,7 +3,8 @@
  * person is using. Visible text under 4.5:1 is reported once per session as a
  * `contrast.<theme>.element.<authored-key>` failure through `reportFailure`, which the Feedback loop
  * turns into an issue. The message names colours, ratio, component, element and path;
- * it never carries the page's text.
+ * it never carries the page's text. Text under a fade in flight (opacity or a colour in a
+ * transition or an animation) is left for a later run: a frame of a fade is no state of the page.
  *
  * Load it with a dynamic import once the page has loaded and gone idle, then call
  * `startContrastWatch()`; it does nothing per frame.
@@ -38,6 +39,8 @@ export type ContrastWatchOptions = {
 
 const STORAGE_KEY = 'ds1:contrast-watch';
 const MAX_KEYS = 200;
+/** How often a page is measured again for text that failed under a fade in flight. */
+const MAX_FADE_RETRIES = 3;
 /** A page with more pieces of text than this is left alone: measuring it would cost too much. */
 const MAX_TEXTS = 4000;
 
@@ -61,6 +64,20 @@ export function contrastComponent(element: Element): string {
   return element.localName;
 }
 
+
+/** Opacity or a colour on its way between two values, by a transition or an animation, on the text's element or anything it is drawn in. */
+function fading(element: Element): boolean {
+  const starts = [element];
+  // Words given straight to a slot are drawn in the slot's shadow tree, not in their parent's.
+  for (const node of element.childNodes) { const slot = node.nodeType === 3 ? (node as Text).assignedSlot : null; if (slot) starts.push(slot); }
+  return starts.some(start => {
+    for (let p: Element | null = start; p; p = paintedParent(p)) {
+      if ((p.getAnimations?.() ?? []).some(animation => animation.playState === 'running'
+        && ((animation.effect as KeyframeEffect | null)?.getKeyframes?.() ?? []).some(frame => 'opacity' in frame || 'color' in frame || 'backgroundColor' in frame))) return true;
+    }
+    return false;
+  });
+}
 
 function hasTooMuchText(root: ParentNode) {
   const document = (root as Node).ownerDocument ?? root as Document;
@@ -104,6 +121,7 @@ export function startContrastWatch(options: ContrastWatchOptions = {}): () => vo
   };
 
   const ran = new Set<string>();
+  const fadeRetries = new Map<string, number>();
   let lastRun = -Infinity;
   let lastTheme = '';
   let stopped = false;
@@ -120,10 +138,14 @@ export function startContrastWatch(options: ContrastWatchOptions = {}): () => vo
     // One run per theme and path, unless the theme changed since the last run.
     if (ran.has(page) && theme === lastTheme) return;
     if (now() < lastRun + interval) { schedule(); return; }
+    let faded = false;
     const finish = () => {
       lastRun = now();
       lastTheme = theme;
-      ran.add(page);
+      // Text that failed mid-fade is no finding yet: the page is measured again once the fade has had time to end.
+      const retries = fadeRetries.get(page) ?? 0;
+      if (faded && retries < MAX_FADE_RETRIES) { fadeRetries.set(page, retries + 1); ran.delete(page); schedule(); }
+      else ran.add(page);
     };
     if (hasTooMuchText(root)) { finish(); return; }
     const scan = scanTextContrast(root);
@@ -140,6 +162,7 @@ export function startContrastWatch(options: ContrastWatchOptions = {}): () => vo
         if (next.done || count >= maxPerRun) { finish(); return; }
         const result = next.value;
         if (result?.ratio === undefined || result.ratio >= minimum || !result.foreground || !result.background) continue;
+        if (fading(result.element)) { faded = true; continue; }
         const identity = contrastIdentity(result.element, registry);
         const key = `contrast.${theme}.${identity.key}`;
         if (known.has(key)) continue;
