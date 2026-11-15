@@ -8,7 +8,6 @@ export default tseslint.config(
       'docs-dist/**',
       'docs/.astro/**',
       'coverage/**',
-      'playwright-report/**',
       'test-results/**',
       'node_modules/**',
       'play/ds1/**',

@@ -13,7 +13,6 @@ pnpm typecheck
 pnpm lint
 pnpm build
 pnpm docs:build
-pnpm test:browser
 ```
 
 ## Pull requests

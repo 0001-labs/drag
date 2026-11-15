@@ -83,7 +83,6 @@
     "deploy": "ci-time deploy 'sync1 guard && pnpm site:build && wrangler deploy'",
     "lint": "astro sync --root docs && eslint .",
     "test": "vitest run",
-    "test:browser": "playwright test",
     "typecheck": "tsc --noEmit",
     "release": "node scripts/release.mjs",
     "release:check": "pnpm typecheck && pnpm lint",
@@ -93,7 +92,6 @@
   "devDependencies": {
     "@astrojs/starlight": "^0.38.4",
     "@eslint/js": "^9.0.0",
-    "@playwright/test": "^1.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

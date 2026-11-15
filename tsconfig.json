@@ -27,7 +27,6 @@
     "tests",
     "examples",
     "eslint.config.js",
-    "playwright.config.ts",
     "tsup.config.ts",
     "vite.config.ts",
     "vitest.config.ts",
