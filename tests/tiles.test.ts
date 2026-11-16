@@ -206,7 +206,7 @@ describe('createTiles', () => {
     pointer('pointermove', window, middle(1) + 30, 50);
     pointer('pointermove', window, middle(1) - 30, 50);
     expect(page.drawn).toHaveLength(count);
-    pointer('pointermove', window, middle(2), 50);
-    expect(page.drawn.length).toBeGreaterThan(count);
+    pointer('pointermove', window, middle(0), 50);
+    expect(page.drawn.at(-1)).toEqual(['a', 'b', 'c']);
   });
 });
