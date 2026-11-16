@@ -297,7 +297,7 @@ type ContainerSnapshot = {
   gap: number;
   paddingStart: number;
   scrollers: Scroller[];
-  horizontalScroll: boolean;
+  horizontalScroll: { liftLeft: number } | undefined;
   /** The element that accepts a drop, measured live, and the scrollers that clip it; the list's box at lift when null. */
   hitArea: { element: HTMLElement; scrollers: HTMLElement[] } | null;
   /** The items other than the source, in order. */
@@ -840,7 +840,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         gap,
         paddingStart: parsePixels(vertical ? style.paddingTop : style.paddingLeft) * scale,
         scrollers: ancestors,
-        horizontalScroll: !vertical && (style.overflowX === 'auto' || style.overflowX === 'scroll') && candidate.element.scrollWidth > candidate.element.clientWidth,
+        horizontalScroll: !vertical && (style.overflowX === 'auto' || style.overflowX === 'scroll') && candidate.element.scrollWidth > candidate.element.clientWidth
+          ? { liftLeft: candidate.element.scrollLeft } : undefined,
         hitArea: candidate.hitArea ? { element: candidate.hitArea, scrollers: scrollParents(candidate.hitArea) } : null,
         slots,
         // The lifted item's margin box and the list's gap: the room siblings give, none where they hold still.
@@ -961,7 +962,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   }
 
   /** Where the lifted item is now in each container, scroll taken into account. */
-  function offsetOf(current: Session, snapshot: ContainerSnapshot): { x: number; y: number } {
+  function offsetOf(current: Session, snapshot: ContainerSnapshot, includeContent = true): { x: number; y: number } {
     const view = current.overlay.ownerDocument.defaultView ?? window;
     let x = view.scrollX - current.windowLiftX;
     let y = view.scrollY - current.windowLiftY;
@@ -969,6 +970,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       x += scroller.element.scrollLeft - scroller.liftLeft;
       y += scroller.element.scrollTop - scroller.liftTop;
     }
+    if (includeContent && snapshot.horizontalScroll) x += snapshot.registration.element.scrollLeft - snapshot.horizontalScroll.liftLeft;
     return { x, y };
   }
 
@@ -977,7 +979,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (snapshot.hitArea) {
       return snapshot.hitArea.scrollers.reduce((clipped, element) => intersect(clipped, measure(element)), measure(snapshot.hitArea.element));
     }
-    const offset = offsetOf(current, snapshot);
+    const offset = offsetOf(current, snapshot, false);
     const box = snapshot.box;
     const visible = { ...box, left: box.left - offset.x, top: box.top - offset.y };
     return snapshot.scrollers.reduce((clipped, { element }) => intersect(clipped, measure(element)), visible);
@@ -1337,8 +1339,16 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       takenY ||= wentY;
       moved ||= wentX || wentY;
     };
-    const scrollers = current.destination?.container.scrollers ?? current.home.scrollers;
-    for (const { element } of scrollers) {
+    const container = current.destination?.container ?? current.home;
+    if (container.horizontalScroll) {
+      const element = container.registration.element;
+      const box = containerBox(current, container);
+      if (contains(box, current.lastX, current.lastY)) {
+        scroll(element, { x: edgeSpeed(current, element, box).x, y: 0 },
+          x => element.scrollBy({ left: x, behavior: 'instant' }), () => ({ x: element.scrollLeft, y: element.scrollTop }));
+      }
+    }
+    for (const { element } of container.scrollers) {
       const box = measure(element);
       // Across a gutter, keep scrolling the shared ancestor under the pointer.
       if (!contains(box, current.lastX, current.lastY)) continue;
@@ -1499,6 +1509,12 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         reportFailure(view, error);
         return;
       }
+    }
+    const landingContainer = current.destination?.container;
+    if (landingContainer?.horizontalScroll) {
+      const box = containerBox(current, landingContainer);
+      const inset = [box.top, view.innerWidth - box.left - box.width, view.innerHeight - box.top - box.height, box.left];
+      current.overlay.style.clipPath = `inset(${inset.map(value => `${Math.max(0, value)}px`).join(' ')})`;
     }
     const target = finalBox ? { x: finalBox.left - current.liftBox.left, y: finalBox.top - current.liftBox.top } : targetPosition(current);
     const from = parseTranslate(current.preview.style.transform);
