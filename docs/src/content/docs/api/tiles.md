@@ -66,7 +66,7 @@ A press on a control inside a tile (a button, a link, a field, or anything marke
 - Escape, a lost pointer or the window losing focus puts everything back.
 - Near the top or the foot of whatever scrolls the tiles, shadow roots included, the tiles scroll under the pointer.
 - While a tile is pressed, the browser's own drag of a picture or link inside it is prevented, unless `canCarry` returned `false`.
-- After a change, the tile that just changed places is ignored until the pointer has left it, so tiles of different sizes do not flip back and forth.
+- After a change, nothing changes again until the pointer has left the place it was aimed at, whatever slides under it, so a layout that re-flows tiles of different sizes does not flip back and forth.
 
 ## Styling
 

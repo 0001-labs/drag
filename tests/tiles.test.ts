@@ -23,14 +23,15 @@ function key(type: 'keydown' | 'keyup', name: string): void {
 }
 
 /** A row of square tiles, laid out by the order it is told: the first at the wall's corner, each a side further on. */
-function wall(names: string[]) {
+function wall(names: string[], slots: (order: string[]) => string[] = (order) => order) {
   const surface = document.createElement('div');
   const tiles = names.map((name) => Object.assign(document.createElement('div'), { id: name }));
   const places = new Map<HTMLElement, number>();
   let order: HTMLElement[] = [...tiles];
   const drawn: string[][] = [];
   const arrange = (next: HTMLElement[]) => {
-    next.forEach((tile, index) => places.set(tile, index));
+    const stand = slots(next.map((tile) => tile.id));
+    next.forEach((tile) => places.set(tile, stand.indexOf(tile.id)));
     drawn.push(next.map((tile) => tile.id));
   };
   arrange(order);
@@ -191,5 +192,21 @@ describe('createTiles', () => {
     pointer('pointermove', window, middle(1) + 20, 50);
     pointer('pointermove', window, middle(1) - 20, 50);
     expect(page.drawn).toHaveLength(count);
+  });
+
+  it('holds its choice while the layout slides another tile under a still pointer', () => {
+    // A layout that re-flows: once a leads b, c is drawn where b stood.
+    const page = wall(['a', 'b', 'c'], (order) => (order.join() === 'b,a,c' ? ['b', 'c', 'a'] : order));
+    controller = createTiles(page);
+    pointer('pointerdown', page.tile('a'), middle(0), 50);
+    pointer('pointermove', window, middle(0) + 10, 50);
+    pointer('pointermove', window, middle(1), 50);
+    expect(page.drawn.at(-1)).toEqual(['b', 'a', 'c']);
+    const count = page.drawn.length;
+    pointer('pointermove', window, middle(1) + 30, 50);
+    pointer('pointermove', window, middle(1) - 30, 50);
+    expect(page.drawn).toHaveLength(count);
+    pointer('pointermove', window, middle(2), 50);
+    expect(page.drawn.length).toBeGreaterThan(count);
   });
 });

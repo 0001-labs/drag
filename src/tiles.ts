@@ -78,8 +78,8 @@ type Carry = {
   /** Where in the tile it was taken hold of, as a share of its width and height. */
   grab: Point;
   mode: TilesMode;
-  /** The tile it last changed places with: it counts again once the pointer has left it. */
-  last: HTMLElement | null;
+  /** Where the tile it last changed places with stood: nothing changes again until the pointer has left there, whatever slides under it. */
+  hold: Box | null;
   changedAt: Point | null;
   slides: Map<HTMLElement, Animation>;
   scrollFrame: number | null;
@@ -170,13 +170,11 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
   /** The order the pointer now asks for, drawn if it differs. */
   function seek(current: Carry): void {
     const at = pointer();
-    const under = (tile: HTMLElement) => {
-      const box = current.boxes.get(tile);
-      return !!box && at.x >= box.x && at.x < box.x + box.width && at.y >= box.y && at.y < box.y + box.height;
-    };
-    const over = current.order.find((tile) => tile !== current.tile && under(tile)) ?? null;
-    if (!over) { current.last = null; return; }
-    if (over === current.last) return;
+    const inside = (box: Box | null | undefined) => !!box && at.x >= box.x && at.x < box.x + box.width && at.y >= box.y && at.y < box.y + box.height;
+    if (inside(current.hold)) return;
+    current.hold = null;
+    const over = current.order.find((tile) => tile !== current.tile && inside(current.boxes.get(tile))) ?? null;
+    if (!over) return;
     if (current.changedAt && Math.hypot(at.x - current.changedAt.x, at.y - current.changedAt.y) < changeDistance) return;
     const mode = modeOf({ shiftKey });
     let next: HTMLElement[];
@@ -193,14 +191,13 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     }
     current.changedAt = at;
     current.mode = mode;
+    current.hold = current.boxes.get(over) ?? null;
     if (!same(next, current.order)) draw(current, next, true);
-    // Still under the pointer where it now stands, it would trade places straight back.
-    current.last = under(over) ? over : null;
   }
 
   /** Shift pressed or released: the same pointer, read the other way from the order it began with. */
   function remode(current: Carry): void {
-    current.last = null;
+    current.hold = null;
     current.changedAt = null;
     if (!same(current.order, current.original)) draw(current, [...current.original], true);
     seek(current);
@@ -265,7 +262,7 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
       boxes: new Map(order.map((each) => [each, boxOf(each, base)])),
       grab: { x: rect.width ? (held.x - rect.left) / rect.width : 0.5, y: rect.height ? (held.y - rect.top) / rect.height : 0.5 },
       mode: modeOf({ shiftKey }),
-      last: null,
+      hold: null,
       changedAt: null,
       slides: new Map(),
       scrollFrame: null,
