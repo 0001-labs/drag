@@ -297,6 +297,7 @@ type ContainerSnapshot = {
   gap: number;
   paddingStart: number;
   scrollers: Scroller[];
+  horizontalScroll: boolean;
   /** The element that accepts a drop, measured live, and the scrollers that clip it; the list's box at lift when null. */
   hitArea: { element: HTMLElement; scrollers: HTMLElement[] } | null;
   /** The items other than the source, in order. */
@@ -839,6 +840,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         gap,
         paddingStart: parsePixels(vertical ? style.paddingTop : style.paddingLeft) * scale,
         scrollers: ancestors,
+        horizontalScroll: !vertical && (style.overflowX === 'auto' || style.overflowX === 'scroll') && candidate.element.scrollWidth > candidate.element.clientWidth,
         hitArea: candidate.hitArea ? { element: candidate.hitArea, scrollers: scrollParents(candidate.hitArea) } : null,
         slots,
         // The lifted item's margin box and the list's gap: the room siblings give, none where they hold still.
@@ -1182,6 +1184,17 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const offset = offsetOf(current, snapshot);
     const { start: draggedStart, end: draggedEnd } = spanOf(current, snapshot);
     const scrolled = vertical ? offset.y : offset.x;
+    if (snapshot.horizontalScroll) {
+      const viewport = containerBox(current, snapshot);
+      return snapshot.slots.filter(slot => {
+        const start = slot.box.left - scrolled;
+        const end = start + slot.box.width;
+        const visibleStart = Math.max(start, viewport.left);
+        const visibleEnd = Math.min(end, viewport.left + viewport.width);
+        const centre = visibleStart < visibleEnd ? (visibleStart + visibleEnd) / 2 : (start + end) / 2;
+        return centre < current.lastX;
+      }).length;
+    }
     const centres = snapshot.slots.map((slot) => baselineStart(current, snapshot, slot) - scrolled + (vertical ? slot.box.height : slot.box.width) / 2);
     const count = centres.length;
 
