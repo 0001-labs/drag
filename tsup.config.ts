@@ -7,6 +7,7 @@ export default defineConfig({
     elements: 'src/elements.ts',
     sortable: 'src/sortable.ts',
     grid: 'src/grid.ts',
+    tiles: 'src/tiles.ts',
     react: 'src/react.ts',
   },
   format: ['esm', 'cjs'],

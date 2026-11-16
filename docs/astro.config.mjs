@@ -51,6 +51,7 @@ export default defineConfig({
       { label: 'API', items: [
         { label: 'Sortable', slug: 'api/sortable' },
         { label: 'Grid', slug: 'api/grid' },
+        { label: 'Tiles', slug: 'api/tiles' },
         { label: 'Element adapter', slug: 'api/element-adapter' },
         { label: 'Utilities', slug: 'api/utilities' },
       ] },

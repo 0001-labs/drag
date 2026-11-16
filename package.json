@@ -64,6 +64,11 @@
       "import": "./dist/grid.js",
       "require": "./dist/grid.cjs"
     },
+    "./tiles": {
+      "types": "./dist/tiles.d.ts",
+      "import": "./dist/tiles.js",
+      "require": "./dist/tiles.cjs"
+    },
     "./react": {
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js",
