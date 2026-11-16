@@ -209,4 +209,37 @@ describe('createTiles', () => {
     pointer('pointermove', window, middle(0), 50);
     expect(page.drawn.at(-1)).toEqual(['a', 'b', 'c']);
   });
+
+  it('tells the page what is carried with every order it draws', () => {
+    const page = wall(['a', 'b', 'c']);
+    const told: Array<{ tile: string; mode: string; original: string[] }> = [];
+    controller = createTiles({ ...page, arrange: (order, carry) => { page.arrange(order); told.push({ tile: carry.tile.id, mode: carry.mode, original: carry.original.map((tile) => tile.id) }); } });
+    pointer('pointerdown', page.tile('a'), middle(0), 50, { shiftKey: true });
+    pointer('pointermove', window, middle(0) + 10, 50);
+    pointer('pointermove', window, middle(2), 50);
+    expect(told.at(-1)).toEqual({ tile: 'a', mode: 'swap', original: ['a', 'b', 'c'] });
+  });
+
+  it('lets the page place a pushed tile, by where in the other tile the pointer is, even when the order stays', () => {
+    const page = wall(['a', 'b', 'c']);
+    const asked: Array<{ over: string; x: number; y: number }> = [];
+    controller = createTiles({
+      ...page,
+      place: ({ tile, over, order, at }) => {
+        asked.push({ over: over.id, x: at.x, y: at.y });
+        const rest = order.filter((each) => each !== tile);
+        rest.splice(rest.indexOf(over) + (at.x < 0.5 ? 0 : 1), 0, tile);
+        return rest;
+      },
+    });
+    pointer('pointerdown', page.tile('a'), middle(0), 50);
+    pointer('pointermove', window, middle(0) + 10, 50);
+    // Into the first half of b: a goes before b, where it already stands in the order.
+    pointer('pointermove', window, 120, 25);
+    expect(asked.at(-1)).toEqual({ over: 'b', x: 0.2, y: 0.25 });
+    expect(page.drawn.at(-1)).toEqual(['a', 'b', 'c']);
+    pointer('pointerup', window, 120, 25);
+    expect(page.changes).toHaveLength(1);
+    expect(page.names(page.changes[0].order)).toEqual(['a', 'b', 'c']);
+  });
 });

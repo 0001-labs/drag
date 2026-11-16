@@ -35,13 +35,38 @@ const tiles = createTiles({
 
 Shift may be pressed or released mid-carry: the order goes back to where it began and the pointer is read again the other way. To choose the mode yourself, pass `mode: ({ shiftKey }) => 'push' | 'swap'`.
 
+## Layouts with more than an order
+
+In a masonry that re-flows from an order, pushing one tile moves many others across columns. If your layout keeps something besides the order, such as each tile's column, use `place` so only the tiles below move down:
+
+```ts
+createTiles({
+  surface: wall,
+  tiles,
+  place: ({ tile, over, order, at }) => {
+    column.set(tile, column.get(over)); // your own record, read by arrange
+    const rest = order.filter((each) => each !== tile);
+    rest.splice(rest.indexOf(over) + (at.y < 0.5 ? 0 : 1), 0, tile); // above or below
+    return rest;
+  },
+  arrange: (order, carry) => {
+    if (same(order, carry.original)) column = new Map(columnsAtStart); // taken back
+    layOut(order, column);
+  },
+  onDrop: ({ order }) => save(order, column),
+});
+```
+
+A tile the page placed counts as moved even when the order is unchanged, so `onDrop` still fires. When the order returns to `carry.original` (Escape, or Shift pressed mid-carry), put your own record back too.
+
 ## Arguments
 
 | Argument | Meaning |
 | --- | --- |
 | `surface` | The element the tiles stand in. Places are measured from its corner. |
 | `tiles()` | The tiles in their current order. |
-| `arrange(order)` | Draw an order. |
+| `arrange(order, carry)` | Draw an order. `carry` is the carried `tile`, the `mode` and the `original` order the carry began with. |
+| `place({ tile, over, order, original, at })` | Decide where a pushed tile goes when the pointer comes over another tile, and return the order to draw. `at` is where in `over` the pointer is, as a share of its width and height. See [layouts with more than an order](#layouts-with-more-than-an-order). |
 | `canCarry(tile, event)` | Return `false` to leave a press to the page, for example to let the browser's own drag take a picture out while a modifier is held. |
 | `mode({ shiftKey })` | Which way the order changes. |
 | `onStart(tile)` | A tile was lifted. |

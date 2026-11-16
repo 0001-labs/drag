@@ -34,13 +34,37 @@ export type TilesChange = {
   order: HTMLElement[];
 };
 
+/** What is being carried, told to the page with each order it draws. */
+export type TilesCarry = {
+  tile: HTMLElement;
+  mode: TilesMode;
+  /** The order the carry began with. */
+  original: readonly HTMLElement[];
+};
+
+/** The pointer has come over another tile while pushing. */
+export type TilesPlace = {
+  tile: HTMLElement;
+  over: HTMLElement;
+  order: readonly HTMLElement[];
+  original: readonly HTMLElement[];
+  /** Where in `over` the pointer is, as a share of its width and height. */
+  at: { x: number; y: number };
+};
+
 export type TilesArgs = {
   /** What the tiles stand in; their places are measured from its corner. */
   surface: HTMLElement;
   /** The tiles in their order. */
   tiles: () => HTMLElement[];
   /** Draw an order: place every tile where it puts it. Called at each change of place, never per frame. */
-  arrange: (order: HTMLElement[]) => void;
+  arrange: (order: HTMLElement[], carry: TilesCarry) => void;
+  /**
+   * Where a pushed tile goes when the pointer comes over another: return the order to draw.
+   * Without it the tile takes the other's place in the order. For a layout whose places are
+   * more than an order (columns, say), decide here and remember it for `arrange`.
+   */
+  place?: (place: TilesPlace) => HTMLElement[] | undefined | void;
   /** Whether a press on a tile carries it. A press on a control inside a tile never does. */
   canCarry?: (tile: HTMLElement, event: PointerEvent) => boolean;
   /** Which way the order changes; Shift swaps by default. */
@@ -78,6 +102,8 @@ type Carry = {
   /** Where in the tile it was taken hold of, as a share of its width and height. */
   grab: Point;
   mode: TilesMode;
+  /** The page placed it (`place`): its place may differ though the order does not. */
+  placed: boolean;
   /** Where the tile it last changed places with stood: nothing changes again until the pointer has left there, whatever slides under it. */
   hold: Box | null;
   changedAt: Point | null;
@@ -143,7 +169,7 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     const held = current.tile.style.translate;
     current.tile.style.translate = 'none';
     current.order = next;
-    args.arrange(next);
+    args.arrange(next, { tile: current.tile, mode: current.mode, original: current.original });
     const now = surface.getBoundingClientRect();
     current.boxes = new Map(next.map((tile) => [tile, boxOf(tile, now)]));
     const time = duration();
@@ -177,6 +203,7 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     if (!over) return;
     if (current.changedAt && Math.hypot(at.x - current.changedAt.x, at.y - current.changedAt.y) < changeDistance) return;
     const mode = modeOf({ shiftKey });
+    current.mode = mode;
     let next: HTMLElement[];
     if (mode === 'swap') {
       const home = current.original.indexOf(current.tile);
@@ -187,19 +214,24 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
         next[home] = over;
       }
     } else {
-      next = reorder({ list: current.order, startIndex: current.order.indexOf(current.tile), finishIndex: current.order.indexOf(over) });
+      const box = current.boxes.get(over);
+      const share = box ? { x: (at.x - box.x) / box.width, y: (at.y - box.y) / box.height } : { x: 0.5, y: 0.5 };
+      const placed = args.place?.({ tile: current.tile, over, order: current.order, original: current.original, at: share });
+      current.placed = !!placed;
+      next = placed ?? reorder({ list: current.order, startIndex: current.order.indexOf(current.tile), finishIndex: current.order.indexOf(over) });
     }
+    if (mode === 'swap') current.placed = false;
     current.changedAt = at;
-    current.mode = mode;
     current.hold = current.boxes.get(over) ?? null;
-    if (!same(next, current.order)) draw(current, next, true);
+    if (current.placed || !same(next, current.order)) draw(current, next, true);
   }
 
   /** Shift pressed or released: the same pointer, read the other way from the order it began with. */
   function remode(current: Carry): void {
     current.hold = null;
     current.changedAt = null;
-    if (!same(current.order, current.original)) draw(current, [...current.original], true);
+    current.mode = modeOf({ shiftKey });
+    if (changed(current)) { current.placed = false; draw(current, [...current.original], true); }
     seek(current);
   }
 
@@ -263,6 +295,7 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
       grab: { x: rect.width ? (held.x - rect.left) / rect.width : 0.5, y: rect.height ? (held.y - rect.top) / rect.height : 0.5 },
       mode: modeOf({ shiftKey }),
       hold: null,
+      placed: false,
       changedAt: null,
       slides: new Map(),
       scrollFrame: null,
@@ -306,9 +339,10 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     window.removeEventListener('keydown', onKey, true);
     window.removeEventListener('keyup', onKey, true);
     surface.removeAttribute('data-drag-tiles');
-    if (how === 'cancel' && !same(current.order, current.original)) draw(current, [...current.original], false);
+    const moved = changed(current);
+    if (how === 'cancel' && moved) { current.placed = false; draw(current, [...current.original], false); }
     settle(current);
-    if (how === 'drop' && !same(current.order, current.original)) {
+    if (how === 'drop' && moved) {
       const from = current.original.indexOf(current.tile);
       const swapped = current.mode === 'swap' ? current.order[from] ?? null : null;
       args.onDrop?.({ tile: current.tile, from, to: current.order.indexOf(current.tile), mode: current.mode, swapped, order: [...current.order] });
@@ -361,6 +395,10 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
       surface.removeEventListener('dragstart', onDragStart, true);
     },
   };
+}
+
+function changed(carry: { order: readonly unknown[]; original: readonly unknown[]; placed: boolean }): boolean {
+  return carry.placed || !same(carry.order, carry.original);
 }
 
 function same(a: readonly unknown[], b: readonly unknown[]): boolean {
