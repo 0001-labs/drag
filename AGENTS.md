@@ -2,6 +2,8 @@
 
 > **Read first:** `/Users/joachim/.agents/harness-instructions.md` (harness instructions), `/Users/joachim/0001/AGENTS.md` (0001). This file wins where they differ.
 
+Ezo list: [`18PZXO`](https://ezo.gs/18PZXO) (Drag), where this project's documentation lives.
+
 Drag is the framework-neutral TypeScript drag library, with documentation at https://drag.0001.dev and Play, an Ezo board on Drag and on @hello-pangea/dnd to compare them, on the documentation's front page (`play/`, mounted by `docs/src/components/Play.astro`; `/playground/` redirects there). Call it Play, never playground. Product code: `DRAG`, as recorded in System. Its independent public repository is `0001-labs/Drag`; work on main and keep commits scoped to Drag.
 
 ## System parts
