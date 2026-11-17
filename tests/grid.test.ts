@@ -26,7 +26,6 @@ function stubBox(element: HTMLElement, left: number, top: number, width: number,
   element.getBoundingClientRect = () => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) });
 }
 
-/** A gesture that writes down everything it hears. */
 function recorder(): GridGesture & { heard: Array<[string, GridDrag]> } {
   const heard: Array<[string, GridDrag]> = [];
   return {
@@ -47,7 +46,6 @@ describe('createGrid', () => {
     vi.useFakeTimers();
     grid = createGrid();
     board = document.createElement('div');
-    // A board of twenty squares by ten, its corner at (100, 50) on the page.
     stubBox(board, 100, 50, 400, 200);
     document.body.append(board);
   });
@@ -64,7 +62,6 @@ describe('createGrid', () => {
     grid.surface({ element: board, unit: () => unit, press });
     pointer('pointerdown', board, 100 + 2.5 * unit, 50 + 0.5 * unit);
     expect(press).toHaveBeenCalledWith(expect.objectContaining({ input: 'mouse', point: { x: 2.5, y: 0.5 }, square: { x: 2, y: 0 }, inside: true, target: board }));
-    // Four pixels is not yet a drag.
     pointer('pointermove', document.body, 100 + 2.5 * unit + 4, 50 + 0.5 * unit);
     expect(gesture.heard).toEqual([]);
     pointer('pointermove', document.body, 100 + 5.4 * unit, 50 + 2.6 * unit);
@@ -78,7 +75,6 @@ describe('createGrid', () => {
     expect(gesture.heard.at(-1)![0]).toBe('drop');
     expect(gesture.heard.at(-1)![1].moved).toEqual({ x: 3, y: 2 });
     expect(grid.isDragging()).toBe(false);
-    // The click a drop would make on what it was let go over never arrives.
     const clicked = vi.fn();
     board.addEventListener('click', clicked);
     board.click();
@@ -178,7 +174,6 @@ describe('createGrid', () => {
     expect(gesture.heard.at(-1)![0]).toBe('drop');
     expect(document.body.textContent).toContain('drop 10 0');
     expect(grid.isDragging()).toBe(false);
-    // Let go, the keys are the page's again.
     expect(key('ArrowRight').defaultPrevented).toBe(false);
   });
 

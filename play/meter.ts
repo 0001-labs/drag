@@ -1,7 +1,3 @@
-/**
- * What a drag cost: frames drawn a second, the longest frame, pointer events
- * a second and React renders, counted from lift to drop.
- */
 export type Reading = {
   frames: number;
   longestFrame: number;
@@ -20,7 +16,6 @@ let renders = 0;
 let frame = 0;
 
 const onPointerMove = (event: PointerEvent) => {
-  // Coalesced events count what the pointer reported, not what was dispatched.
   pointerEvents += event.getCoalescedEvents?.().length || 1;
 };
 

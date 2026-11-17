@@ -1,10 +1,3 @@
-/*
- * Play, on the docs' front page, on Design system 1's measures: a square is
- * 20px, a cell is four squares wide and as many high as it has lines, drawn a
- * pixel short, edge to edge as an Ezo list is. Words stand on the lower sixteen
- * of a square. The measures are on the root, as the lifted copy is drawn over
- * the page, outside Play.
- */
 :root {
   --square: 20px;
   --cell-fill: light-dark(var(--slate-light), var(--slate-dark));
@@ -70,7 +63,6 @@
   margin-top: var(--square);
 }
 
-/* Margins, not gaps, keep the pixel between cells. */
 .play-column {
   display: flex;
   flex-direction: column;
@@ -112,7 +104,6 @@
   text-overflow: ellipsis;
 }
 
-/* A paragraph wraps on lines of a square, each line's words on its sixteen. */
 .play-cell--text {
   padding-top: 1px;
   line-height: var(--square);
@@ -124,7 +115,6 @@
   font-family: var(--typeface-medium);
 }
 
-/* The lifted cell or column, in either engine. */
 .play-cell[data-lifted],
 .play-cell[data-drag-preview],
 .play-column[data-lifted],

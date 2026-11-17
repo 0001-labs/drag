@@ -1,16 +1,3 @@
-/**
- * Pointer-driven sortable lists: lift an item by a pointer, a finger hold or a
- * pen, move it through lists of the same type, and drop it in a slot.
- *
- * The motion follows @hello-pangea/dnd (Apache-2.0, © 2019 Atlassian,
- * © 2021 Gabriel Santerre; see NOTICE): siblings move out of the way by the
- * lifted item's whole size, a sibling moves once the lifted item's edge passes
- * its centre, counting the room it has already given, and the timings and
- * curves are carried over too. The engine around it is new and has no framework: the
- * lifted item is a clone in an overlay moved by writing its transform in the
- * pointer handler, siblings move by the `translate` property alone, geometry is
- * measured once at lift, and nothing changes layout while the pointer moves.
- */
 import { flowHolds, flowStarts, type Flow, type FlowItem } from './flow';
 import type { Cleanup } from './types';
 import { once } from './util';
@@ -26,18 +13,15 @@ export type SortableStart = {
   draggableId: string;
   type: string;
   source: SortableLocation;
-  /** A pointer moves the item freely; the keyboard moves it a slot at a time. */
   mode: 'FLUID' | 'SNAP';
 };
 
-/** The item the lifted one is held over, to be put together with it rather than beside it. */
 export type SortableCombine = {
   draggableId: string;
   droppableId: string;
 };
 
 export type SortableUpdate = SortableStart & {
-  /** No destination while combining: the lifted item is over another, not between two. */
   destination: SortableLocation | null;
   combine: SortableCombine | null;
 };
@@ -52,31 +36,11 @@ export type SortableContainerArgs = {
   type?: string;
   axis?: SortableAxis;
   isDropDisabled?: () => boolean;
-  /**
-   * Whether an item held over the middle of another here combines with it
-   * (as a list dropped onto a list makes a folder): the leading edge inside
-   * the middle half of the other item.
-   */
   isCombineEnabled?: () => boolean;
-  /** The list's name in announcements; its aria-label or id when left out. */
   label?: string;
-  /**
-   * Its items hold still while something is carried over them: nothing makes
-   * room, the keyboard steps the lifted item from item to item, and a drop
-   * lands at once. For a page that draws where the item will land itself, as
-   * a board of squares does.
-   */
   still?: boolean;
-  /** Keep an item lifted from here on one line; the engine's `lockAxis` when left out. */
   lockAxis?: 'x' | 'y';
-  /** The element drawn under the pointer for an item lifted from here; the engine's `renderPreview`, then a clone, when it gives none. */
   renderPreview?: (source: HTMLElement) => HTMLElement | null | undefined;
-  /**
-   * The element whose box accepts a drop, measured as it stands at each move
-   * (the room it reserves, a resize and its scroll all count); the list itself
-   * when left out. A column given here takes a drop over its header, its
-   * footer or the room below its last item into its list.
-   */
   hitArea?: HTMLElement;
 };
 
@@ -84,42 +48,17 @@ export type SortableItemArgs = {
   element: HTMLElement;
   id: string;
   type?: string;
-  /** Where the item is held; the item itself when left out. */
   handle?: HTMLElement | null;
-  /**
-   * Whether the item may lift now, by what ('mouse', 'pen', 'touch' or
-   * 'keyboard'), and from where: the element pressed, or the focused handle.
-   */
   canDrag?: (by: { input: string; target: Element | null }) => boolean;
-  /** Let a press on a button, field or link inside the handle start a drag. */
   allowInteractive?: boolean;
-  /** The item's name in announcements; its aria-label or text when left out. */
   label?: string;
-  /**
-   * The item is writing, a block an editor draws: its handle keeps the
-   * page's caret, selection, cursor and keys. A mouse or pen lifts it only
-   * after a press held still for `hold()` milliseconds, asked at each press;
-   * a press that moves sooner is the page's, and selects words. A hold of 0
-   * lifts it as soon as the press moves, as any item. The keyboard never
-   * lifts it, and it gets no tab stop or instructions of its own.
-   *
-   * With `axis`, a press that first moves along it, at least twice as far as
-   * across, lifts at once without the hold: words are selected along a line,
-   * so a block moved down a page is told apart from words being selected.
-   */
   text?: {
     hold: () => number;
     axis?: 'x' | 'y';
-    /**
-     * Whether the press, moved to this point before the hold, is carrying the item rather than choosing
-     * words: a block in a column taken to the next column, where no words of its own can be chosen. It lifts
-     * at once there, even if words were being chosen on the way.
-     */
     carries?: (point: { x: number; y: number }) => boolean;
   };
 };
 
-/** What an announcement is about. Positions count from one. */
 export type SortableAnnouncement = {
   item: string;
   list: string;
@@ -127,7 +66,6 @@ export type SortableAnnouncement = {
   count: number;
 };
 
-/** What a screen reader hears, in the product's own words and language. */
 export type SortableMessages = {
   instructions: string;
   lifted: (at: SortableAnnouncement) => string;
@@ -140,80 +78,30 @@ export type SortableMessages = {
 };
 
 export type SortableOptions = {
-  /**
-   * Called as the item is about to lift, before anything is measured, so the
-   * page can draw itself as the drag needs (a selection folded into the row
-   * that carries it). Draw it synchronously (`flushSync` in React).
-   */
   onBeforeCapture?: (before: { draggableId: string; mode: SortableStart['mode'] }) => void;
-  /** Called once the item lifts. */
   onDragStart?: (start: SortableStart) => void;
-  /** Called when the destination changes. */
   onDragUpdate?: (update: SortableUpdate) => void;
-  /**
-   * Called when the drop settles. Apply the new order synchronously
-   * (`flushSync` in React): the engine takes its offsets away right after.
-   */
   onDragEnd?: (result: SortableResult) => void;
-  /** Commit the final layout before landing. Return its authored item (which may have been redrawn).
-   * Await layout work here; the preview then animates directly to this measured destination.
-   * When supplied, this owns the commit; onDragEnd remains a completion notification. */
   prepareDrop?: (result: SortableResult) => HTMLElement | null | (() => HTMLElement | null) | Promise<HTMLElement | null | (() => HTMLElement | null)>;
-  /** How long a finger holds before the item lifts, in milliseconds. */
   touchHold?: number;
-  /** How far a mouse or pen moves before the item lifts, in pixels. */
   dragDistance?: number;
-  /** Siblings moving out of the way. */
   outOfTheWay?: { duration: number; easing: string };
-  /** The lifted item settling into its slot, its duration by distance. */
   drop?: { minDuration: number; maxDuration: number; easing: string };
-  /** How near an edge, in pixels, the pointer scrolls the list or the page; never more than a fifth of the scroller's visible length. */
   autoScrollEdge?: number;
-  /** Keep the lifted item on one line as the pointer moves: across ('x') or down ('y'). */
   lockAxis?: 'x' | 'y';
-  /** Custom properties copied from the source item onto the overlay. */
   inheritProperties?: string[];
-  /** The element drawn under the pointer; a clone of the item by default. */
   renderPreview?: (source: HTMLElement) => HTMLElement;
-  /**
-   * The page's last word on the element drawn under the pointer, before it is
-   * shown: take off what belongs to its own editing (a selection mark the
-   * clone copied) or add to it (a count). The item itself is left alone.
-   */
   onPreview?: (preview: HTMLElement, source: HTMLElement) => void;
-  /**
-   * Whether the item carried to this point is going somewhere other than among a list's items: beside one of
-   * them, into another column. While it is, nothing makes room and every item stands where it stood at the
-   * lift, so the page's own mark of that place stays on what it marks; a drop then reports the item's own place.
-   * Asked at every move and scroll, before anything moves.
-   */
   stay?: (point: { x: number; y: number }) => boolean;
-  /** Announcements and the keyboard instructions; English by default. */
   messages?: Partial<SortableMessages>;
-  /**
-   * The pointer's place in the viewport, for a page that rewrites the
-   * event's own coordinates; `clientX` and `clientY` by default.
-   */
   pointerPoint?: (event: PointerEvent) => { x: number; y: number };
-  /**
-   * A pointer drop outside every list. Return true when the product has taken
-   * the item (onto a canvas, say): it lands there at once instead of flying
-   * home. `onDragEnd` still follows, with no destination.
-   */
   onDropOutside?: (start: SortableStart, point: { x: number; y: number }) => boolean;
-  /**
-   * Every move a sibling makes: making room while the item is carried
-   * ('drag'), and any move after release ('drop'), which means the page drew
-   * it somewhere other than where it had made room. A sibling moves once per
-   * change of place; a 'drop' move is a second one.
-   */
   onMovement?: (movement: SortableMovement) => void;
 };
 
 export type SortableMovement = {
   element: HTMLElement;
   phase: 'drag' | 'drop';
-  /** How far it moved, in screen pixels. */
   x: number;
   y: number;
 };
@@ -245,12 +133,9 @@ const defaults = {
   autoScrollEdge: 60,
 } as const;
 
-/** The drop: the longest duration is reached at this distance. */
 const maxDropDistance = 1500;
-/** The fastest edge scroll, in pixels for each sixtieth of a second: the same on a 60Hz and a 120Hz screen. */
 const maxScrollSpeed = 24;
 const scrollFrame = 1000 / 60;
-/** How far towards an edge a pointer that lifted inside its band moves before that edge scrolls. */
 const scrollIntent = 10;
 const inheritedText = ['color', 'font', 'letter-spacing', 'line-height', '-webkit-font-smoothing'];
 const interactive = 'input, textarea, select, option, button, a[href], [contenteditable]:not([contenteditable="false"])';
@@ -286,7 +171,6 @@ type Scroller = {
 
 type Slot = {
   item: ItemRegistration;
-  /** Index in the container before the lift, the source included. */
   original: number;
   box: Box;
 };
@@ -298,22 +182,12 @@ type ContainerSnapshot = {
   paddingStart: number;
   scrollers: Scroller[];
   horizontalScroll: { liftLeft: number } | undefined;
-  /** The element that accepts a drop, measured live, and the scrollers that clip it; the list's box at lift when null. */
   hitArea: { element: HTMLElement; scrollers: HTMLElement[] } | null;
-  /** The items other than the source, in order. */
   slots: Slot[];
-  /** The room the lifted item takes in this container, its margins and gap included. */
   room: number;
-  /** The lifted item's margin before it along this container's axis. */
   marginStart: number;
-  /** Screen pixels to the list's own, for a list inside a scaled parent. */
   scale: number;
   isHome: boolean;
-  /**
-   * The list's flow at lift, every member in its own order (the source
-   * included at home), and the lifted item as it would stand here; null where
-   * the model does not draw the list where the page did.
-   */
   flow: { items: FlowItem[]; source: FlowItem; flow: Flow; origin: number } | null;
 };
 
@@ -324,9 +198,7 @@ type Pending = {
   startX: number;
   startY: number;
   timer: ReturnType<typeof setTimeout> | null;
-  /** Waiting for a still press to lift writing; a move first leaves the press to the page. */
   held: boolean;
-  /** Choosing words, and still watched in case the press carries the item after all (`text.carries`). */
   choosing?: boolean;
 };
 
@@ -352,22 +224,16 @@ type Session = {
   sourceVisibility: string;
   reserved: ContainerSnapshot | null;
   scrollFrame: number | null;
-  /** When the last edge-scroll step ran, and the part of a pixel each scroller is still owed. */
   scrollTime: number | null;
   scrollOwed: Map<object, { x: number; y: number }>;
-  /** The edges that may scroll, by scroller: one the item lifted inside waits for the pointer to mean it. */
   scrollArmed: Map<object, { left: boolean; right: boolean; top: boolean; bottom: boolean }>;
   impactFrame: number | null;
   dropping: boolean;
   preparing?: boolean;
-  /** Ends the landing now: a press during it is not kept waiting. */
   land?: () => void;
-  /** Where the commit drew each sibling, and how far the page had scrolled then: nothing moves from there. */
   committed?: { boxes: Map<HTMLElement, Box>; scrollX: number; scrollY: number };
   landing?: { element: HTMLElement; visibility: string };
-  /** The sibling the lifted item is held over, to combine with; the gap stays as it was. */
   combine: { container: ContainerSnapshot; slot: Slot } | null;
-  /** The line the lifted item keeps to, if any. */
   lockAxis: 'x' | 'y' | undefined;
 };
 
@@ -390,10 +256,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   let eventView: Window | null = null;
   let destroyed = false;
   let reducedMotion = false;
-  /** Siblings still settling from the last drop: a new lift finishes them before it measures. */
   const settling = new Set<Animation>();
   let liveRegion: HTMLElement | null = null;
-  /** Forgets the release still owed by a pointer whose drag was cancelled while it was down. */
   let forgetRelease: (() => void) | null = null;
 
   function container(args: SortableContainerArgs): Cleanup {
@@ -430,9 +294,7 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     };
     items.set(args.element, registration);
     handles.set(handle, registration);
-    // Writing keeps its own caret, cursor and keys: no grab, no tab stop, no instructions.
     handle.setAttribute('data-drag-handle', args.text ? 'text' : '');
-    // The keyboard reaches the handle, and a screen reader says how to lift it.
     const addedTabIndex = !args.text && !handle.hasAttribute('tabindex') && !handle.matches(interactive);
     if (addedTabIndex) handle.tabIndex = 0;
     const describedBy = handle.getAttribute('aria-describedby');
@@ -457,7 +319,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const existing = documents.get(document);
     if (existing) return existing;
     const view = document.defaultView ?? window;
-    // A framed page owns its event stream and its DOM constructors.
     view.addEventListener('pointerdown', onPointerDown, true);
     view.addEventListener('keydown', onHandleKeyDown, true);
     if (!document.querySelector(`style[${handleStyleId}]`)) {
@@ -496,7 +357,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     announce(at ? messages.moved(at) : messages.outside(current.item.label()));
   }
 
-  /** Space on a focused handle lifts its item for the keyboard. */
   function onHandleKeyDown(event: KeyboardEvent): void {
     if (destroyed || session || pending || event.key !== ' ' || event.defaultPrevented) return;
     const target = eventElement(event.target);
@@ -526,11 +386,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
 
   function onPointerDown(event: PointerEvent): void {
     if (destroyed) return;
-    // A new press: the release a cancelled drag was owed never came, or has been dealt with.
     forgetRelease?.();
-    // A press while the last drop is still landing is not kept waiting: the drop lands now.
     if (session?.dropping && !pending) session.land?.();
-    // A press while the keyboard carries an item puts it back: the pointer has taken over.
     if (session && session.mode === 'SNAP' && !session.dropping) {
       void drop('CANCEL');
       return;
@@ -541,7 +398,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const target = eventElement(event.target);
     if (!registration || !registration.canDrag({ input: event.pointerType || 'mouse', target })) return;
 
-    // Writing lifts after a still press, so a press that moves sooner still selects words.
     const hold = event.pointerType !== 'touch' && registration.text ? Math.max(0, registration.text.hold()) : 0;
     pending = {
       item: registration,
@@ -561,8 +417,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   }
 
   function onPointerMove(event: PointerEvent): void {
-    // A mouse moving with no button down was released where the page could not see it
-    // (over another window, behind a dialog): the press is over, and a carried item goes home.
     if (event.pointerType === 'mouse' && event.buttons === 0) {
       if (pending && event.pointerId === pending.pointerId) clearPending();
       else if (session && session.mode === 'FLUID' && event.pointerId === session.pointerId && !session.dropping) void drop('CANCEL');
@@ -575,17 +429,14 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       const carries = pending.pointerType !== 'touch' ? pending.item.text?.carries : undefined;
       if ((pending.pointerType === 'touch' || pending.held || pending.choosing) && !carries?.(point)) {
         if (pending.choosing) return;
-        // Writing moved along its axis is lifted at once; moved any other way, it selects words.
         const axis = pending.pointerType !== 'touch' ? pending.item.text?.axis : undefined;
         const along = Math.abs(axis === 'x' ? point.x - pending.startX : point.y - pending.startY);
         const across = Math.abs(axis === 'x' ? point.y - pending.startY : point.x - pending.startX);
         if (!axis || along < 2 * across) {
-          // It moved before the hold finished: a finger scrolls, a press on writing selects words.
           if (!carries) {
             clearPending();
             return;
           }
-          // Words are being chosen; the press is watched in case it goes on to carry the item.
           if (pending.timer) clearTimeout(pending.timer);
           pending.timer = null;
           pending.held = false;
@@ -627,7 +478,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       return;
     }
     if (current.mode !== 'SNAP') return;
-    // While lifted by the keyboard, these keys belong to the drag, not the page.
     if (event.key === ' ' || event.key === 'Enter') {
       void drop('DROP');
     } else if (event.key in arrows) {
@@ -640,18 +490,15 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   }
 
   function onTouchMove(event: TouchEvent): void {
-    // While lifted, the finger moves the item rather than the page.
     if (session && event.cancelable) event.preventDefault();
   }
 
-  /** No menu while an item is pressed or carried: not the browser's, and not one the page draws itself. */
   function onContextMenu(event: Event): void {
     if (!pending && !session) return;
     event.preventDefault();
     event.stopImmediatePropagation();
   }
 
-  /** A pressed or lifted item is the engine's: a native drag, even one WebKit starts from the lifted clone, would take the pointer away. */
   function onNativeDragStart(event: Event): void {
     if (pending || session) event.preventDefault();
   }
@@ -661,7 +508,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (session && !session.dropping) void drop('CANCEL');
   }
 
-  /** A page hidden or left mid-drag never sees its pointer come back: cancel, as a lost window does. */
   function onVisibility(event: Event): void {
     if (event.type === 'visibilitychange' && eventView?.document.visibilityState !== 'hidden') return;
     onBlur();
@@ -721,10 +567,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (!session) removeWindowListeners();
   }
 
-  /**
-   * A drag cancelled while its pointer is down (Escape, a lost window) still has a release to
-   * come, and the click that follows it would press whatever lies under the pointer.
-   */
   function swallowRelease(view: Window, pointerId: number): void {
     forgetRelease?.();
     const released = (event: PointerEvent) => {
@@ -761,7 +603,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     pending = null;
 
     options.onBeforeCapture?.({ draggableId: pressed.id, mode });
-    // Lifted again before the last drop settled: measure the page where it rests, not mid-animation.
     for (const animation of settling) animation.finish();
     settling.clear();
     const registration = registrationFor(pressed);
@@ -777,7 +618,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       return;
     }
 
-    // Asked for less motion: siblings and the drop move at once.
     reducedMotion = view.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const liftBox = measure(registration.element);
     const sourceStyle = view.getComputedStyle(registration.element);
@@ -794,14 +634,12 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
 
     for (const candidate of containers.values()) {
       if (candidate.type !== registration.type || !candidate.element.isConnected || candidate.element.ownerDocument !== document) continue;
-      // A list inside the lifted item travels with it: never a destination, and its items never make room.
       if (registration.element.contains(candidate.element)) continue;
       const members = itemsOf(candidate);
       const isHome = candidate === homeRegistration;
       const style = view.getComputedStyle(candidate.element);
       const vertical = candidate.axis === 'vertical';
       const box = measure(candidate.element);
-      // A list drawn inside a scaled parent: its own pixels against the screen's.
       const scale = scaleOf(candidate.element, box);
       const gap = parsePixels(vertical ? style.rowGap : style.columnGap) * scale;
       const slots: Slot[] = [];
@@ -844,7 +682,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
           ? { liftLeft: candidate.element.scrollLeft } : undefined,
         hitArea: candidate.hitArea ? { element: candidate.hitArea, scrollers: scrollParents(candidate.hitArea) } : null,
         slots,
-        // The lifted item's margin box and the list's gap: the room siblings give, none where they hold still.
         room: candidate.still ? 0 : (vertical ? liftBox.height + margins.vertical * itemScale : liftBox.width + margins.horizontal * itemScale) + gap,
         marginStart: (vertical ? margins.top : margins.left) * itemScale,
         isHome,
@@ -883,7 +720,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       position: 'absolute',
       left: `${liftBox.left}px`,
       top: `${liftBox.top}px`,
-      // Drawn at the item's own size and scaled as it was on the page.
       width: `${liftBox.width / itemScale}px`,
       height: `${liftBox.height / itemScale}px`,
       transformOrigin: '0 0',
@@ -896,12 +732,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       pointerEvents: 'none',
     });
     overlay.appendChild(preview);
-    // An item that paints no background of its own lets what it passes over show through its words:
-    // it is carried on what it stood on, so it covers the page below as it looked where it was.
     if (!customPreview) standOnBackground(preview, registration.element);
     options.onPreview?.(preview, registration.element);
     document.body.appendChild(overlay);
-    // What had scrolled inside the item stands where it stood: a clone starts at nought.
     for (const [copy, left, top] of copied?.scrolled ?? []) {
       copy.scrollLeft = left;
       copy.scrollTop = top;
@@ -961,7 +794,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     scheduleAutoScroll(current);
   }
 
-  /** Where the lifted item is now in each container, scroll taken into account. */
   function offsetOf(current: Session, snapshot: ContainerSnapshot, includeContent = true): { x: number; y: number } {
     const view = current.overlay.ownerDocument.defaultView ?? window;
     let x = view.scrollX - current.windowLiftX;
@@ -974,7 +806,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     return { x, y };
   }
 
-  /** Where a drop lands in this container now: its hit area as it stands, or the list's box at lift moved by what has scrolled since. */
   function containerBox(current: Session, snapshot: ContainerSnapshot): Box {
     if (snapshot.hitArea) {
       return snapshot.hitArea.scrollers.reduce((clipped, element) => intersect(clipped, measure(element)), measure(snapshot.hitArea.element));
@@ -991,7 +822,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     let over: ContainerSnapshot | null = null;
     let overArea = Infinity;
 
-    // Headed somewhere the lists do not hold: held over its own place, everything as it stood at the lift.
     if (options.stay?.({ x: pointerX, y: pointerY })) {
       const uncombined = setCombine(current, null);
       const previous = current.destination;
@@ -1018,7 +848,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       }
     }
 
-    // Combining is checked first, against the gap as it stands, which it leaves where it is.
     const combining = over && current.mode === 'FLUID' ? combineIn(current, over) : null;
     if (combining && over) {
       if (setCombine(current, { container: over, slot: combining })) {
@@ -1047,10 +876,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     announceMove(current);
   }
 
-  /**
-   * The keyboard moves the item a slot along its list, or into the nearest
-   * list of its type beside it, where it keeps its height as near as it can.
-   */
   function moveByKey(current: Session, direction: { x: number; y: number }): void {
     const from = current.destination ?? { container: current.home, index: current.sourceIndex };
     const vertical = from.container.registration.axis === 'vertical';
@@ -1075,7 +900,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     announceMove(current);
   }
 
-  /** The nearest list of the same type in a direction across the axis. */
   function neighbourOf(current: Session, from: ContainerSnapshot, direction: { x: number; y: number }): ContainerSnapshot | null {
     const origin = centreOf(containerBox(current, from));
     let best: ContainerSnapshot | null = null;
@@ -1095,7 +919,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     return best;
   }
 
-  /** Where the preview's centre falls among a list's slots. */
   function indexNear(current: Session, snapshot: ContainerSnapshot): number {
     const vertical = snapshot.registration.axis === 'vertical';
     const offset = offsetOf(current, snapshot);
@@ -1116,7 +939,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     current.preview.style.transform = previewTransform(target.x, target.y, current.previewScale);
   }
 
-  /** Scrolls the list, then the page, so the moved item is in view. */
   function revealPreview(current: Session): void {
     const view = current.overlay.ownerDocument.defaultView;
     if (!view) return;
@@ -1139,7 +961,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     placePreview(current, true);
   }
 
-  /** Where the lifted item runs along a list's axis now, in the viewport. */
   function spanOf(current: Session, snapshot: ContainerSnapshot): { start: number; end: number } {
     const vertical = snapshot.registration.axis === 'vertical';
     const liftStart = vertical ? current.liftBox.top : current.liftBox.left;
@@ -1151,11 +972,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     return { start: liftStart + moved, end: liftStart + moved + size };
   }
 
-  /**
-   * The sibling the lifted item is held over: before the
-   * gap, the leading edge inside its middle half; after the gap, the
-   * trailing edge inside the middle half of where it has moved to.
-   */
   function combineIn(current: Session, snapshot: ContainerSnapshot): Slot | null {
     const destination = current.destination;
     if (!destination || destination.container !== snapshot || !snapshot.registration.isCombineEnabled()) return null;
@@ -1180,7 +996,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     return true;
   }
 
-  /** The lifted item's index in a container, with hysteresis so it does not flicker. */
   function indexIn(current: Session, snapshot: ContainerSnapshot): number {
     const vertical = snapshot.registration.axis === 'vertical';
     const offset = offsetOf(current, snapshot);
@@ -1206,15 +1021,12 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     }
 
     let index = current.destination.index;
-    // Moving back: a sibling before the gap moves once the leading edge passes its centre.
     while (index > 0 && draggedStart < centres[index - 1]) index--;
     if (index !== current.destination.index) return index;
-    // Moving on: a sibling after the gap, displaced by the room, moves once the trailing edge passes its displaced centre.
     while (index < count && draggedEnd > centres[index] + snapshot.room) index++;
     return index;
   }
 
-  /** A slot's start along the axis with the source's room closed, at lift scroll. */
   function baselineStart(current: Session, snapshot: ContainerSnapshot, slot: Slot): number {
     const vertical = snapshot.registration.axis === 'vertical';
     const start = vertical ? slot.box.top : slot.box.left;
@@ -1256,7 +1068,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     }
   }
 
-  /** Where the list draws its items with the lifted one where it is now, and how far each sibling stands off; null without a flow. */
   function flowOrder(current: Session, snapshot: ContainerSnapshot): { shifts: number[]; source: number | null } | null {
     const model = snapshot.flow;
     if (!model) return null;
@@ -1268,7 +1079,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     return { shifts, source: at >= 0 ? starts[at] : null };
   }
 
-  /** Moves a sibling `value` screen pixels off along the list's axis. */
   function shift(current: Session, element: HTMLElement, screen: number, snapshot: ContainerSnapshot): void {
     const axis = snapshot.registration.axis;
     const value = screen / snapshot.scale;
@@ -1290,7 +1100,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const moved = (value - before) * snapshot.scale;
     options.onMovement?.({ element, phase: 'drag', x: axis === 'vertical' ? 0 : moved, y: axis === 'vertical' ? moved : 0 });
     element.style.translate = value === 0 ? 'none' : axis === 'vertical' ? `0 ${value}px` : `${value}px 0`;
-    // How far it stands off, for what inside it stays where it is (`translate: calc(-1 * var(--drag-shift)) 0`).
     element.style.setProperty('--drag-shift', `${value}px`);
   }
 
@@ -1301,7 +1110,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const step = (time: number) => {
       if (session !== current || current.dropping) return;
       current.scrollFrame = null;
-      // By the clock, not the frame: a 120Hz screen scrolls as far in a second as a 60Hz one.
       const elapsed = current.scrollTime === null ? scrollFrame : time - current.scrollTime;
       current.scrollTime = time;
       if (autoScroll(current, Math.min(2, Math.max(0.25, elapsed / scrollFrame)))) {
@@ -1314,11 +1122,9 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     current.scrollFrame = view.requestAnimationFrame(step);
   }
 
-  /** Scrolls what the pointer is at the edge of, for `frames` sixtieths of a second; whether there is more to scroll. */
   function autoScroll(current: Session, frames: number): boolean {
     const view = current.overlay.ownerDocument.defaultView;
     if (!view) return false;
-    // An axis belongs to the innermost scroller that wants it; `moved` says something scrolled or is about to.
     let takenX = false, takenY = false, moved = false;
     const scroll = (key: object, speed: { x: number; y: number }, by: (x: number, y: number) => void, at: () => { x: number; y: number }) => {
       const x = takenX ? 0 : speed.x, y = takenY ? 0 : speed.y;
@@ -1327,7 +1133,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       owed.x = x ? owed.x + x * frames : 0;
       owed.y = y ? owed.y + y * frames : 0;
       if (!x && !y) return;
-      // Whole pixels are scrolled; the rest is owed to the next frame, so a slow scroll still moves.
       const stepX = Math.trunc(owed.x), stepY = Math.trunc(owed.y);
       owed.x -= stepX;
       owed.y -= stepY;
@@ -1350,7 +1155,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     }
     for (const { element } of container.scrollers) {
       const box = measure(element);
-      // Across a gutter, keep scrolling the shared ancestor under the pointer.
       if (!contains(box, current.lastX, current.lastY)) continue;
       scroll(element, edgeSpeed(current, element, box), (x, y) => element.scrollBy(x, y), () => ({ x: element.scrollLeft, y: element.scrollTop }));
       if (takenX && takenY) return true;
@@ -1360,18 +1164,14 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     return moved;
   }
 
-  /** How fast the pointer scrolls a scroller from where it is in it, in pixels for each sixtieth of a second. */
   function edgeSpeed(current: Session, key: object, box: Box): { x: number; y: number } {
     const armed = current.scrollArmed.get(key) ?? { left: false, right: false, top: false, bottom: false };
     current.scrollArmed.set(key, armed);
     const along = (position: number, lifted: number, start: number, length: number, before: 'left' | 'top', after: 'right' | 'bottom') => {
-      // The band is at most a fifth of what is visible: a short list on a phone keeps a middle that holds still.
       const edge = Math.min(settings.autoScrollEdge, length / 5);
       if (edge <= 0) return 0;
       const fromStart = position - start;
       const fromEnd = start + length - position;
-      // An item lifted inside a band has not asked to scroll: that edge waits until the pointer has
-      // left the band, or has gone on towards the edge, so a block picked up at the foot of the page stays put.
       if (fromStart >= edge || position <= lifted - scrollIntent) armed[before] = true;
       if (fromEnd >= edge || position >= lifted + scrollIntent) armed[after] = true;
       if (fromStart < edge) return armed[before] ? -maxScrollSpeed * ((edge - Math.max(fromStart, 0)) / edge) ** 2 : 0;
@@ -1391,7 +1191,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (current.scrollFrame !== null) view.cancelAnimationFrame(current.scrollFrame);
     if (current.impactFrame !== null) view.cancelAnimationFrame(current.impactFrame);
 
-    // Dropped onto another item: it shrinks into it and fades.
     if (reason === 'DROP' && current.combine) {
       const { container, slot } = current.combine;
       const result: SortableResult = { ...startOf(current), destination: null, combine: combineOf(current), reason };
@@ -1421,11 +1220,8 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       return;
     }
     setCombine(current, null);
-    // Cancelled with its pointer still down: the release to come is the end of this drag, not a click.
     if (reason === 'CANCEL' && current.mode === 'FLUID') swallowRelease(view, current.pointerId);
 
-    // A cancel, or a drop outside every list, sends the item home.
-    // A product may take an item dropped outside every list, where it lies.
     if (reason === 'DROP' && !current.destination && current.mode === 'FLUID') {
       if (options.onDropOutside?.(startOf(current), { x: current.lastX, y: current.lastY })) {
         finish(current, { ...startOf(current), destination: null, combine: null, reason: 'DROP' });
@@ -1441,7 +1237,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
 
     let finalElement: HTMLElement | null = null;
     let finalBox: Box | null = null;
-    /** Sets each sibling the commit moved sliding from where it stood, and keeps where the commit drew it. */
     const settle = (siblings: HTMLElement[], before: Map<HTMLElement, DOMRect>, resting: Map<HTMLElement, Box>) => {
       const displaced = new Map<HTMLElement, { x: number; y: number }>();
       current.committed = { boxes: new Map(), scrollX: view.scrollX, scrollY: view.scrollY };
@@ -1453,14 +1248,12 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         current.committed.boxes.set(element, { left: next.left, top: next.top, width: next.width, height: next.height });
       }
       for (const [element, from] of reducedMotion ? [] : displaced) {
-        // A list that slides carries its items with it: an item slides only as far as it stands off from that.
         let holder = element.parentElement;
         while (holder && !displaced.has(holder)) holder = holder.parentElement;
         const carried = holder ? displaced.get(holder)! : { x: 0, y: 0 };
         const x = from.x - carried.x, y = from.y - carried.y;
         if (Math.abs(x) < 0.01 && Math.abs(y) < 0.01) continue;
         const animation = element.animate([{ translate: `${x}px ${y}px` }, { translate: (element.ownerDocument.defaultView ?? window).getComputedStyle(element).translate }], { duration: settings.outOfTheWay.duration, easing: settings.outOfTheWay.easing });
-        // A page without the Web Animations API gives nothing back; there is nothing to finish then.
         if (!animation) continue;
         settling.add(animation);
         animation.addEventListener?.('finish', () => settling.delete(animation));
@@ -1469,12 +1262,10 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     };
     if (reason === 'DROP' && options.prepareDrop) {
       current.preparing = true;
-      // Preserve the visual positions while the adapter commits the actual final structure.
       const siblings = siblingsOf(current);
       const before = new Map(siblings.map(element => [element, element.getBoundingClientRect()]));
       const resting = restingBoxes(current, siblings);
       for (const [element, saved] of current.shifts) { element.style.transition = 'none'; element.style.translate = saved.translate; }
-      // The committed item takes the room a foreign list reserved for it: the reserve goes as the commit lands.
       current.reserved?.registration.element.style.removeProperty('--drag-reserve');
       try {
         const prepared = options.prepareDrop({ ...startOf(current), destination: returning ? null : locationOf(current.destination!), combine: null, reason });
@@ -1486,15 +1277,10 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
           current.landing = { element: finalElement, visibility: finalElement.style.visibility };
           finalElement.style.visibility = 'hidden';
         }
-        // Everything is measured where the commit drew it, and siblings are set sliding from where they stood,
-        // before the browser paints the commit: otherwise they show at their new places for a frame, jump back
-        // and slide. The landing is where the item rests, not where a sibling still on its way holds it, and a
-        // sibling is told how far it stands from its own place, not its list's.
         finalBox = finalElement?.isConnected ? measure(finalElement) : null;
         settle(siblings, before, resting);
         await new Promise<void>(resolve => (current.overlay.ownerDocument.defaultView ?? window).requestAnimationFrame(() => resolve()));
         if (session !== current) return;
-        // A page that draws the commit a frame later names its element now.
         const updated = locate();
         if (updated !== finalElement) {
           if (current.landing) current.landing.element.style.visibility = current.landing.visibility;
@@ -1503,8 +1289,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
           finalBox = finalElement?.isConnected ? restingBox(finalElement, current.shifts) : null;
         }
       } catch (error) {
-        // The page could not commit the drop. Nothing stays lifted: the drag ends here as a cancel,
-        // the page is handed back as it now stands, and the failure is the page's to hear.
         if (session === current) finish(current, { ...startOf(current), destination: null, combine: null, reason: 'CANCEL' });
         reportFailure(view, error);
         return;
@@ -1520,7 +1304,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const from = parseTranslate(current.preview.style.transform);
     const distance = Math.hypot(target.x - from.x, target.y - from.y);
     const { minDuration, maxDuration, easing } = settings.drop;
-    // Among items that hold still the page draws where it lands: the drop is there at once.
     const lands = !returning && !!current.destination?.container.registration.still;
     const duration = distance < 0.5 || reducedMotion || lands ? 0 : minDuration + (maxDuration - minDuration) * Math.min(distance / maxDropDistance, 1);
 
@@ -1548,7 +1331,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     setTimeout(done, duration + 50);
   }
 
-  /** Where the preview lands, as its translation from the lift position. */
   function targetPosition(current: Session): { x: number; y: number } {
     const destination = current.destination ?? { container: current.home, index: current.sourceIndex };
     const snapshot = destination.container;
@@ -1556,7 +1338,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     const offset = offsetOf(current, snapshot);
     const slots = snapshot.slots;
     let start: number;
-    // Where items hold still, the lifted one stands over the item at its index, as it was before the lift.
     const still = snapshot.registration.still;
     const over = still ? stillSlot(snapshot, destination.index) : undefined;
 
@@ -1565,18 +1346,15 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     if (snapshot.isHome && destination.index === current.sourceIndex) {
       start = vertical ? current.liftBox.top : current.liftBox.left;
     } else if (flowed !== null) {
-      // The list's flow says where the dropped order draws it.
       start = flowed;
     } else if (over) {
       start = vertical ? over.box.top : over.box.left;
     } else if (still && slots.length > 0) {
-      // Past the last item: just beyond it, after the gap.
       const last = slots[slots.length - 1];
       start = (vertical ? last.box.top + last.box.height : last.box.left + last.box.width) + snapshot.gap;
     } else if (destination.index < slots.length) {
       start = baselineStart(current, snapshot, slots[destination.index]);
     } else if (slots.length > 0) {
-      // After the last sibling: its size and the lifted item's room beyond its own size.
       const last = slots[slots.length - 1];
       const size = vertical ? current.liftBox.height : current.liftBox.width;
       start = baselineStart(current, snapshot, last) + (vertical ? last.box.height : last.box.width) + snapshot.room - size;
@@ -1584,7 +1362,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       start = (vertical ? snapshot.box.top : snapshot.box.left) + snapshot.paddingStart + snapshot.marginStart;
     }
 
-    // Across the axis the item keeps where it stood in its own list.
     const crossInHome = vertical ? current.liftBox.left - current.home.box.left : current.liftBox.top - current.home.box.top;
     const cross = snapshot.isHome
       ? vertical
@@ -1592,7 +1369,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         : current.liftBox.top
       : (vertical ? snapshot.box.left : snapshot.box.top) + crossInHome;
 
-    // Boxes were measured at lift; take away what has scrolled since.
     const startNow = start - (vertical ? offset.y : offset.x);
     const crossNow = cross - (vertical ? offset.x : offset.y);
     return {
@@ -1601,7 +1377,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     };
   }
 
-  /** The item at an index among items that hold still, counted as they stood with the lifted one among them. */
   function stillSlot(snapshot: ContainerSnapshot, index: number): Slot | undefined {
     if (!snapshot.isHome) return snapshot.slots[index];
     return snapshot.slots.find((slot) => slot.original === index);
@@ -1609,7 +1384,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
 
   function finish(current: Session, result: SortableResult): void {
     const at = announcement(current);
-    // Without prepareDrop the page draws the drop in onDragEnd: once it has, nothing should have moved.
     const siblings = options.onMovement && !current.preparing ? siblingsOf(current) : [];
     const resting = restingBoxes(current, siblings);
     try {
@@ -1623,8 +1397,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
         for (const element of siblings) if (element.isConnected) reportDrop(element, resting.get(element)!, element.getBoundingClientRect());
       });
     }
-    // A prepared drop was measured as it was committed. Whatever the page has moved since, through the
-    // landing and its own drawing after it, is a second movement too.
     const committed = options.onMovement ? current.committed : undefined;
     if (committed) {
       view.requestAnimationFrame(() => {
@@ -1638,7 +1410,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     }
     if (result.combine && current.combine) announce(messages.combined(current.item.label(), current.combine.slot.item.label()));
     else if (at) announce(result.reason === 'DROP' && result.destination ? messages.dropped(at) : messages.returned(at));
-    // A keyboard drag keeps the focus on the moved item, wherever it was drawn again.
     if (current.mode === 'SNAP') {
       for (const registration of items.values()) {
         if (registration.id === current.item.id && registration.element.isConnected) {
@@ -1649,7 +1420,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     }
   }
 
-  /** Every item that stayed in a list the lifted item could reach. */
   function siblingsOf(current: Session): HTMLElement[] {
     return [...new Set(current.containers.flatMap((snapshot) => snapshot.slots.map((slot) => slot.item.element)))].filter((element) => element.isConnected);
   }
@@ -1658,7 +1428,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
     return new Map(elements.map((element) => [element, restingBox(element, current.shifts)]));
   }
 
-  /** A sibling drawn more than a pixel from where it had made room has moved a second time. */
   function reportDrop(element: HTMLElement, resting: Box, next: Box): void {
     const x = next.left - resting.left, y = next.top - resting.top;
     if (Math.abs(x) > 1 || Math.abs(y) > 1) options.onMovement?.({ element, phase: 'drop', x, y });
@@ -1735,7 +1504,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       : null;
   }
 
-  /** The item's registration now: the page may have drawn it again before the lift. */
   function registrationFor(lifted: ItemRegistration): ItemRegistration | null {
     if (lifted.element.isConnected && items.get(lifted.element) === lifted) return lifted;
     for (const candidate of items.values()) {
@@ -1760,8 +1528,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
       destroyed = true;
       clearPending();
       forgetRelease?.();
-      // A prepared layout may destroy its old editor while replacing columns.
-      // The landing overlay owns its lifetime until the already-started handoff finishes.
       if (session && !session.preparing) cleanup(session);
       for (const { view, instructions, liveRegion } of documents.values()) {
         view.removeEventListener('pointerdown', onPointerDown, true);
@@ -1776,7 +1542,6 @@ export function createSortable(options: SortableOptions = {}): SortableControlle
   };
 }
 
-/** A failure in the page's own code, raised where the page hears its errors, outside the drag that met it. */
 function reportFailure(view: Window, error: unknown): void {
   const report = (view as Window & { reportError?: (error: unknown) => void }).reportError;
   if (typeof report === 'function') report.call(view, error);
@@ -1787,7 +1552,6 @@ function promiseLike<T>(value: T | Promise<T>): value is Promise<T> {
   return !!value && typeof (value as Promise<T>).then === 'function';
 }
 
-// Structural element checks work when registration and events belong to another same-origin window.
 function eventElement(target: EventTarget | null): Element | null {
   return target && (target as Node).nodeType === 1 ? target as Element : null;
 }
@@ -1805,7 +1569,6 @@ function centreOf(box: Box): { x: number; y: number } {
   return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
 }
 
-/** Text only a screen reader reads. */
 function hiddenText(document: Document, id: string): HTMLElement {
   const element = document.createElement('div');
   element.id = id;
@@ -1830,11 +1593,9 @@ function labelOf(element: HTMLElement, handle: HTMLElement): string {
   return text.length > 60 ? `${text.slice(0, 59)}…` : text || 'Item';
 }
 
-/** How much larger than its own pixels an element is drawn on the screen. */
 function scaleOf(element: HTMLElement, box: Box): number {
   if (element.offsetWidth <= 0 || box.width <= 0) return 1;
   const scale = box.width / element.offsetWidth;
-  // offsetWidth is rounded to a whole pixel: a difference that small is not a scale.
   return Math.abs(scale - 1) < 0.02 ? 1 : scale;
 }
 
@@ -1859,23 +1620,17 @@ function contains(box: Box, x: number, y: number): boolean {
   return x >= box.left && x < box.left + box.width && y >= box.top && y < box.top + box.height;
 }
 
-/** A list's flow at lift, when the model draws its members where the page drew them. */
 function flowOf(style: CSSStyleDeclaration, box: Box, scale: number, vertical: boolean, items: FlowItem[], source: FlowItem): ContainerSnapshot['flow'] {
   const collapse = vertical && /^(block|flow-root|list-item)$/.test(style.display);
   const gap = collapse ? 0 : parsePixels(vertical ? style.rowGap : style.columnGap) * scale;
   const origin = (vertical ? box.top : box.left)
     + (parsePixels(vertical ? style.borderTopWidth : style.borderLeftWidth) + parsePixels(vertical ? style.paddingTop : style.paddingLeft)) * scale;
   const first = items[0];
-  // A first margin that stands outside the list: it has passed through the list's edge.
   const through = collapse && !!first && first.marginStart > 0.5 && Math.abs(first.start - origin) <= 1;
   const flow = { gap, collapse, through };
   return flowHolds(items, flow, origin) ? { items, source, flow, origin } : null;
 }
 
-/**
- * Where an element would stand once every slide still on its way has ended: its own, and that of
- * anything it stands in that is itself still sliding.
- */
 function restingBox(element: HTMLElement, shifts: Map<HTMLElement, { scale: number }>): Box {
   const box = measure(element);
   const view = element.ownerDocument.defaultView ?? window;
@@ -1886,7 +1641,6 @@ function restingBox(element: HTMLElement, shifts: Map<HTMLElement, { scale: numb
   };
   let left = box.left, top = box.top;
   for (let node: HTMLElement | null = element; node; node = node.parentElement) {
-    // Only what is sliding differs from where it is set to stand: its own slide, or a settling one.
     const set = node.style.translate, drawn = view.getComputedStyle(node).translate;
     if (set === drawn || (!set && drawn === 'none')) continue;
     const target = pair(set), now = pair(drawn), scale = shifts.get(node)?.scale ?? 1;
@@ -1919,12 +1673,10 @@ function scrollParents(element: HTMLElement): HTMLElement[] {
   return parents;
 }
 
-/** Whether a computed style paints nothing behind the element's content. */
 function paintsNoBackground(style: CSSStyleDeclaration): boolean {
   return (!style.backgroundImage || style.backgroundImage === 'none') && /^(transparent|rgba\([^)]*,\s*0\)|)$/.test(style.backgroundColor.trim());
 }
 
-/** Gives a preview of an item without a background the colour of the nearest ancestor that paints one. */
 function standOnBackground(preview: HTMLElement, source: HTMLElement): void {
   const view = source.ownerDocument.defaultView;
   if (!view || !paintsNoBackground(view.getComputedStyle(source))) return;
@@ -1937,42 +1689,29 @@ function standOnBackground(preview: HTMLElement, source: HTMLElement): void {
   }
 }
 
-/** Elements that draw nothing themselves: their appearance is not worth reading. */
 const unstyled = /^(style|script|template|link|meta|title|head)$/;
 
-/**
- * A copy of the item that looks as it does now, wherever it is put: the overlay has none of the
- * item's ancestors, so each element's resolved appearance is written onto its copy. Also returns
- * what had scrolled inside it, to be scrolled again once the copy is in the page.
- */
 function cloneForPreview(source: HTMLElement): { clone: HTMLElement; scrolled: Array<[Element, number, number]> } {
   const clone = source.cloneNode(true) as HTMLElement;
   const view = source.ownerDocument.defaultView!;
   const scrolled: Array<[Element, number, number]> = [];
-  // A browser computes the same standard properties for every element, so their names are read once;
-  // the custom ones differ, and are only read where they are used.
   const sourceStyle = view.getComputedStyle(source);
   const listed = Array.from(sourceStyle).filter((property) => !property.startsWith('--'));
-  // A page that lists only what was declared (a test's DOM) is copied whole, element by element.
   const standard = listed.length > 100 ? listed : null;
-  // What the item itself resolves each custom property to: inside it, only one that differs is written again.
   const inherited = new Map<string, string>();
-  /** A canvas is cloned empty: draw what it shows. */
   const paint = (from: HTMLCanvasElement, to: HTMLCanvasElement) => {
-    try { to.getContext('2d')?.drawImage(from, 0, 0); } catch { /* A canvas that cannot be read stays empty. */ }
+    try { to.getContext('2d')?.drawImage(from, 0, 0); } catch {}
   };
   const drawsPseudo = (element: Element, pseudo: string) => {
     const content = view.getComputedStyle(element, pseudo).content;
     return !!content && content !== 'none' && content !== 'normal';
   };
-  /** `drawn`: inside a copied shadow tree, which draws itself from its own styles. */
   const copy = (element: Element, target: Element, drawn = false): void => {
     const styled = target as HTMLElement | SVGElement;
     if (drawn) {
       if (element.scrollLeft || element.scrollTop) scrolled.push([target, element.scrollLeft, element.scrollTop]);
       if (element.localName === 'canvas') paint(element as HTMLCanvasElement, target as HTMLCanvasElement);
     } else if (styled.style && !unstyled.test(element.localName)) {
-      // A clone copies attributes, not properties: an element drawn from properties (a Lit element) gets them again.
       const properties = (element.constructor as { elementProperties?: unknown }).elementProperties;
       if (properties instanceof Map) {
         for (const name of properties.keys() as Iterable<PropertyKey>) {
@@ -1980,13 +1719,10 @@ function cloneForPreview(source: HTMLElement): { clone: HTMLElement; scrolled: A
         }
       }
       const style = view.getComputedStyle(element);
-      // Nothing inside an element that is not drawn is drawn either.
       if (element !== source && style.display === 'none') {
         styled.style.setProperty('display', 'none', 'important');
         return;
       }
-      // Standard properties are resolved values, so custom properties matter only where something
-      // still reads them: the item itself, a component drawing its own tree, a pseudo-element.
       if (!standard || element === source) {
         for (const property of Array.from(style)) {
           const value = style.getPropertyValue(property);
@@ -2004,24 +1740,19 @@ function cloneForPreview(source: HTMLElement): { clone: HTMLElement; scrolled: A
           }
         }
       }
-      // The copy is a picture: it takes no press, hover or native drag, whatever the item's own parts take.
       styled.style.setProperty('pointer-events', 'none', 'important');
       target.removeAttribute('contenteditable');
       if (element.scrollLeft || element.scrollTop) scrolled.push([target, element.scrollLeft, element.scrollTop]);
       if (element.localName === 'canvas') paint(element as HTMLCanvasElement, target as HTMLCanvasElement);
     }
-    // A component this page has no definition for (it was made in another window and adopted here)
-    // never draws itself in the copy: its tree is copied as it stands instead.
     const shadow = element.shadowRoot;
     if (shadow && !target.shadowRoot && !view.customElements?.get(element.localName)) {
       try {
         const root = target.attachShadow({ mode: 'open' });
         for (const child of Array.from(shadow.childNodes)) root.appendChild(child.cloneNode(true));
         if (shadow.adoptedStyleSheets?.length) root.adoptedStyleSheets = [...shadow.adoptedStyleSheets];
-        // Its own styles came with it and its host stands as it stood, so the tree draws itself:
-        // only what a copy never carries (a component inside it, a scroll, a canvas) is seen to.
         pairs(shadow, root, true);
-      } catch { /* An element that takes no shadow tree keeps its light content. */ }
+      } catch {}
     }
     pairs(element, target, drawn);
   };
@@ -2030,8 +1761,6 @@ function cloneForPreview(source: HTMLElement): { clone: HTMLElement; scrolled: A
     for (let index = 0; index < originals.length && index < copies.length; index++) copy(originals[index], copies[index], drawn);
   };
   copy(source, clone);
-  // Logical insets copied as !important override the overlay's physical left/top.
-  // Keep descendant appearance, but let the drag engine own the root's position.
   for (const property of ['inset', 'inset-block', 'inset-inline', 'inset-block-start', 'inset-block-end', 'inset-inline-start', 'inset-inline-end', 'top', 'right', 'bottom', 'left', 'margin-block', 'margin-inline', 'margin-block-start', 'margin-block-end', 'margin-inline-start', 'margin-inline-end']) clone.style.removeProperty(property);
   clone.removeAttribute('id');
   clone.removeAttribute('data-drag-source');

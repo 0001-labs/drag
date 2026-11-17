@@ -8,10 +8,6 @@ type Props = {
   onMove: (result: MoveResult) => void;
 };
 
-/**
- * The board on Drag's sortable engine through its React layer. React draws the
- * board and hears only the lift and the drop; everything between is the engine's.
- */
 export function DragBoard({ board, onStart, onMove }: Props) {
   return (
     <SortableProvider onDragStart={onStart} onDragEnd={onMove}>

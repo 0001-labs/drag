@@ -23,6 +23,7 @@ export default tseslint.config(
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: { 'no-empty': ['error', { allowEmptyCatch: true }] },
   },
   {
     files: ['**/*.js', '**/*.mjs'],

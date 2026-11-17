@@ -28,7 +28,6 @@ function pointer(type: string, target: EventTarget, x: number, y: number): void 
   target.dispatchEvent(event);
 }
 
-/** A box drawn as a browser draws it: where layout put it, moved by its translate. */
 function stub(element: HTMLElement, layout: number, height: number): void {
   element.getBoundingClientRect = () => {
     const [, y = '0'] = (element.style.translate || '0 0').split(' ');
@@ -37,10 +36,6 @@ function stub(element: HTMLElement, layout: number, height: number): void {
   };
 }
 
-/**
- * Block flow with collapsing margins: a heading with space above, a paragraph
- * with space below, and a line with space above that collapses into it.
- */
 function page() {
   const list = document.createElement('div');
   list.style.paddingTop = '20px';
@@ -74,7 +69,6 @@ describe('one movement per change of place', () => {
     });
     sortable.container({ element: list, id: 'page' });
     parts.forEach((part, index) => sortable.item({ element: part, id: `part${index}` }));
-    // Carry the paragraph past the line below it.
     pointer('pointerdown', parts[1], 10, 120);
     pointer('pointermove', window, 10, 126);
     pointer('pointermove', window, 10, 200);
@@ -83,7 +77,6 @@ describe('one movement per change of place', () => {
 
   it('moves a sibling straight to where the dropped order draws it, margins collapsed', () => {
     const { sortable, parts } = drag(() => {});
-    // The line closes up to the heading, its own margin collapsing into nothing: 60px, not the paragraph's 80px room.
     expect(parts[2].style.translate).toBe('0 -60px');
     sortable.destroy();
   });

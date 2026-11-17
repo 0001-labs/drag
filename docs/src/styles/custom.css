@@ -51,13 +51,11 @@ body {
 .content-panel + .content-panel { padding-top: 0; }
 @media (max-width: 50rem) { .content-panel { padding-inline: var(--grid); } }
 
-/* Design system 1's root sheet has a .header of its own, a square item; Starlight's header is the page's width. */
 header.header { box-sizing: border-box; display: block; width: 100%; height: calc(2 * var(--grid)); border-bottom: 0; box-shadow: inset 0 -1px var(--ds1-docs-divider); padding: 0 var(--grid); }
 .sidebar-pane { border-inline-end: 0; box-shadow: inset -1px 0 var(--ds1-docs-divider); }
 .sidebar-content { padding: 0; height: 100%; }
 .sidebar-pane .sl-scroll, .sidebar-pane > .sidebar-content { height: 100%; }
 
-/* A display title stands on two squares. */
 h1#_top {
   display: flex;
   align-items: center;
@@ -66,7 +64,6 @@ h1#_top {
   color: var(--ds-text-color);
 }
 
-/* Starlight's own markup inside the prose: its anchored headings and its code frames. */
 .sl-markdown-content :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper) + .sl-heading-wrapper:not(:where(.not-content *)) {
   margin-top: calc(2 * var(--grid));
 }
@@ -80,7 +77,6 @@ h1#_top {
 .sl-markdown-content .sl-heading-wrapper > :is(h1, h2, h3, h4, h5, h6) { display: block; margin: 0; padding: 0; }
 .sl-markdown-content .sl-heading-wrapper .sl-anchor-link { position: relative; display: flex; align-items: center; height: var(--grid); margin: 0; }
 
-/* Code frames: thirteen on the same rows, a square of room around it, its frame a hairline. */
 .expressive-code {
   --ec-codeFontFml: var(--typeface-mono);
   --ec-codePadInl: var(--grid);
@@ -99,16 +95,13 @@ h1#_top {
 .expressive-code .frame .ec-line .code span { font-family: var(--typeface-mono); }
 
 
-/* On this page: one square a line, muted, the section you are in in the ink. */
 .right-sidebar-panel h2 { font-size: var(--docs-type); font-weight: 400; color: var(--ds-text-color-muted); line-height: var(--grid); margin: 0; }
 .right-sidebar-panel a { font-size: var(--docs-type); line-height: var(--grid); padding-block: 0; color: var(--ds-text-color-muted); }
 .right-sidebar-panel a[aria-current="true"] { color: var(--ds-text-color); }
 
-/* Previous and next at the foot, words alone. */
 .pagination-links a { border: 0; box-shadow: inset 0 0 0 1px var(--ds1-docs-divider); border-radius: calc(4px * var(--sf, 1)); font-size: var(--docs-type); line-height: var(--grid); }
 .pagination-links a .link-title { font-size: var(--docs-type); }
 
-/* Examples show Drag on the same square as the surrounding documentation. */
 .docs-demo { margin-block: var(--grid); padding: var(--grid); border: 1px solid var(--ds1-docs-divider); border-radius: calc(4px * var(--sf, 1)); }
 .docs-demo-header { display: flex; flex-wrap: wrap; gap: var(--grid); justify-content: space-between; margin-bottom: var(--grid); }
 .docs-demo-header h2, .docs-demo-header h3 { margin: 0; font: inherit; }

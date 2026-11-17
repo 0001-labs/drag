@@ -7,7 +7,6 @@ export default defineConfig({
   outDir: '../docs-dist',
   publicDir: '../play/ds1',
   devToolbar: { enabled: false },
-  // Play lived on a page of its own; it is the front page now.
   redirects: { '/playground': '/' },
   vite: { server: { fs: { allow: ['..'] } } },
   integrations: [starlight({

@@ -1,22 +1,3 @@
-/**
- * Tiles the page lays out, carried among each other: a wall of pictures, a
- * masonry, cards of every size.
- *
- * The page owns the layout (`arrange`): told an order, it places every tile.
- * A tile pressed and moved is lifted as it is, nothing cloned, and stays under
- * the pointer where it was taken hold of. The others go where the order now
- * draws them, sliding there in transform alone. The order changes in one of
- * two ways. `push`: the tile takes the place of the one the pointer is over
- * and the rest step aside. `swap`: it and that one trade places and nothing
- * else moves (while Shift is held, unless `mode` says otherwise). Let go, it
- * settles into its place and the page hears the order (`onDrop`); Escape, a
- * lost pointer or the window losing the focus put everything back.
- *
- * The gesture is the grid's (`createGrid`): a mouse or a pen lifts after five
- * pixels, a finger after a still hold, a press that never lifted stays a
- * click. Near the top or the foot of whatever scrolls the tiles, shadow roots
- * included, it scrolls under the pointer.
- */
 import { createGrid, type GridOptions } from './grid';
 import { reorder } from './util';
 
@@ -24,69 +5,47 @@ export type TilesMode = 'push' | 'swap';
 
 export type TilesChange = {
   tile: HTMLElement;
-  /** Where it stood in the order, and where it stands now. */
   from: number;
   to: number;
-  /** How the order last changed. */
   mode: TilesMode;
-  /** The tile it traded places with, after a swap. */
   swapped: HTMLElement | null;
   order: HTMLElement[];
 };
 
-/** What is being carried, told to the page with each order it draws. */
 export type TilesCarry = {
   tile: HTMLElement;
   mode: TilesMode;
-  /** The order the carry began with. */
   original: readonly HTMLElement[];
 };
 
-/** The pointer has come over another tile while pushing. */
 export type TilesPlace = {
   tile: HTMLElement;
   over: HTMLElement;
   order: readonly HTMLElement[];
   original: readonly HTMLElement[];
-  /** Where in `over` the pointer is, as a share of its width and height. */
   at: { x: number; y: number };
 };
 
 export type TilesArgs = {
-  /** What the tiles stand in; their places are measured from its corner. */
   surface: HTMLElement;
-  /** The tiles in their order. */
   tiles: () => HTMLElement[];
-  /** Draw an order: place every tile where it puts it. Called at each change of place, never per frame. */
   arrange: (order: HTMLElement[], carry: TilesCarry) => void;
-  /**
-   * Where a pushed tile goes when the pointer comes over another: return the order to draw.
-   * Without it the tile takes the other's place in the order. For a layout whose places are
-   * more than an order (columns, say), decide here and remember it for `arrange`.
-   */
   place?: (place: TilesPlace) => HTMLElement[] | undefined | void;
-  /** Whether a press on a tile carries it. A press on a control inside a tile never does. */
   canCarry?: (tile: HTMLElement, event: PointerEvent) => boolean;
-  /** Which way the order changes; Shift swaps by default. */
   mode?: (keys: { shiftKey: boolean }) => TilesMode;
   onStart?: (tile: HTMLElement) => void;
-  /** Let go on a changed order. */
   onDrop?: (change: TilesChange) => void;
-  /** Let go where it was taken, or taken back. */
   onCancel?: (tile: HTMLElement) => void;
 };
 
 export type TilesOptions = GridOptions & {
-  /** How long a tile slides to a new place, in milliseconds; nothing slides under reduced motion. */
   duration?: number;
   easing?: string;
-  /** How far the pointer moves before the order may change again, in pixels. */
   changeDistance?: number;
 };
 
 export type TilesController = {
   isCarrying: () => boolean;
-  /** Put everything back. */
   cancel: () => void;
   destroy: () => void;
 };
@@ -99,12 +58,9 @@ type Carry = {
   original: HTMLElement[];
   order: HTMLElement[];
   boxes: Map<HTMLElement, Box>;
-  /** Where in the tile it was taken hold of, as a share of its width and height. */
   grab: Point;
   mode: TilesMode;
-  /** The page placed it (`place`): its place may differ though the order does not. */
   placed: boolean;
-  /** Where the tile it last changed places with stood: nothing changes again until the pointer has left there, whatever slides under it. */
   hold: Box | null;
   changedAt: Point | null;
   slides: Map<HTMLElement, Animation>;
@@ -140,7 +96,6 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     return still ? 0 : options.duration ?? 200;
   };
 
-  /** The pointer's place from the surface's corner, whatever has scrolled. */
   function pointer(): Point {
     const base = surface.getBoundingClientRect();
     return { x: client.x - base.left + surface.scrollLeft, y: client.y - base.top + surface.scrollTop };
@@ -151,7 +106,6 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     return { x: rect.left - base.left + surface.scrollLeft, y: rect.top - base.top + surface.scrollTop, width: rect.width, height: rect.height };
   }
 
-  /** Keep the carried tile under the pointer, where it was taken hold of. */
   function follow(current: Carry): void {
     const box = current.boxes.get(current.tile);
     if (!box) return;
@@ -159,7 +113,6 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     current.tile.style.translate = `${at.x - current.grab.x * box.width - box.x}px ${at.y - current.grab.y * box.height - box.y}px`;
   }
 
-  /** Draw an order, each tile but the carried one sliding from where it is seen to where it now stands. */
   function draw(current: Carry, next: HTMLElement[], carried: boolean): void {
     const base = surface.getBoundingClientRect();
     const seen = new Map<HTMLElement, Box>();
@@ -193,7 +146,6 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     animation.addEventListener('cancel', done);
   }
 
-  /** The order the pointer now asks for, drawn if it differs. */
   function seek(current: Carry): void {
     const at = pointer();
     const inside = (box: Box | null | undefined) => !!box && at.x >= box.x && at.x < box.x + box.width && at.y >= box.y && at.y < box.y + box.height;
@@ -208,7 +160,6 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     if (mode === 'swap') {
       const home = current.original.indexOf(current.tile);
       next = [...current.original];
-      // Over the tile now standing where it came from, everything goes back.
       if (current.order.indexOf(over) !== home || current.original[home] === over) {
         next[current.original.indexOf(over)] = current.tile;
         next[home] = over;
@@ -226,7 +177,6 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     if (current.placed || !same(next, current.order)) draw(current, next, true);
   }
 
-  /** Shift pressed or released: the same pointer, read the other way from the order it began with. */
   function remode(current: Carry): void {
     current.hold = null;
     current.changedAt = null;
@@ -252,7 +202,6 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     return null;
   }
 
-  /** How fast the pointer near the top or the foot scrolls what holds the tiles. */
   function scrollSpeed(scroller: HTMLElement | null): number {
     const rect = scroller?.getBoundingClientRect();
     const start = rect ? Math.max(rect.top, 0) : 0, end = rect ? Math.min(rect.bottom, window.innerHeight) : window.innerHeight;
@@ -311,7 +260,6 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     args.onStart?.(tile);
   }
 
-  /** The carried tile, let go: from under the pointer to where its place is. */
   function settle(current: Carry): void {
     const { tile } = current;
     const from = tile.style.translate;
@@ -380,7 +328,6 @@ export function createTiles(args: TilesArgs, options: TilesOptions = {}): TilesC
     },
   });
 
-  // A picture or a link pressed would be taken by the browser's own drag, which ends the pointer's.
   const onDragStart = (event: Event) => {
     if (pressed) event.preventDefault();
   };

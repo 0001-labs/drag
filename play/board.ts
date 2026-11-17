@@ -1,12 +1,9 @@
-/** The board both engines draw: lists of columns of cells, as Ezo lays them out. */
-
 export type CellKind = 'item' | 'header' | 'text';
 
 export type Cell = {
   id: string;
   kind: CellKind;
   title: string;
-  /** How many squares high the cell is. */
   rows: number;
 };
 
@@ -63,7 +60,6 @@ const lists: Array<{ id: string; title: string; columns: Array<[string, string[]
   },
 ];
 
-/** A text cell runs to more squares the longer it is, as Ezo's paragraphs do. */
 function cellFrom(id: string, title: string): Cell {
   if (title.startsWith('# ')) return { id, kind: 'header', title: title.slice(2), rows: 1 };
   if (title.length > 24) return { id, kind: 'text', title, rows: Math.min(4, Math.ceil(title.length / 11)) };
@@ -89,12 +85,10 @@ export function createBoard(load: Load): Board {
   }));
 }
 
-/** The droppable that holds a list's columns. */
 export const columnsDroppable = (listId: string) => `${listId}:columns`;
 export const columnType = (listId: string) => `column:${listId}`;
 export const cellType = 'cell';
 
-/** The board after a drop: a cell into any column, or a column within its list. */
 export function applyMove(board: Board, result: MoveResult): Board {
   const { source, destination } = result;
   if (!destination) return board;

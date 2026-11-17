@@ -1,125 +1,70 @@
-/**
- * Things on squares: pressed and carried a whole square at a time, by a
- * pointer, a finger held still or the keys, as a diagram's boxes are moved,
- * sized and joined on its board.
- *
- * A surface is ruled in squares (`unit()` pixels each) from its top left
- * corner, its own scroll included. Each press on it asks the page what it
- * carries (`press`): a gesture, or nothing to leave the press to the page. A
- * gesture hears where the pointer is, in squares, as it moves, and is let go
- * (`onDrop`) or taken back (`onCancel`: Escape, a lost pointer, the window
- * losing the focus). A press that never lifted is a click (`onClick`). A
- * source outside the surface (a tool in a bar) starts a gesture measured on
- * the surface all the same, so a box can be carried out of a bar onto a board.
- *
- * Nothing moves by itself and nothing is cloned: the page draws what the
- * gesture means (a box on other squares, a line to the pointer) and writes
- * it once it is let go. A mouse or a pen lifts once it has moved five
- * pixels; a finger after a still hold, so a finger that moves sooner
- * scrolls the page. Near an edge, the surface and the page scroll under it.
- *
- * The keyboard carries a gesture too (`keyboard`): the arrows a square at a
- * time and Shift a step, Tab and Shift-Tab to the next or last place worth
- * landing on (`targets`), Enter or Space lets go and Escape takes it back,
- * each move said to a screen reader (`announce`).
- */
 import type { Cleanup } from './types';
 import { once } from './util';
 
-/** A place in squares from a surface's top left; fractions where a pointer is inside a square. */
 export type GridPoint = { x: number; y: number };
 
 export type GridInput = 'mouse' | 'pen' | 'touch' | 'keyboard';
 
-/** Where a gesture stands as it is carried. */
 export type GridDrag = {
   input: GridInput;
-  /** Where the press began, in squares. */
   origin: GridPoint;
-  /** Where the pointer is, in squares. */
   point: GridPoint;
-  /** The square under the pointer: its column and row from nought. */
   square: GridPoint;
-  /** How far the pointer has carried what it holds, in whole squares, to the nearest. */
   moved: GridPoint;
-  /** Whether the pointer is over the surface. */
   inside: boolean;
-  /** The element under the pointer, inside shadow roots too; null for the keyboard. */
   target: Element | null;
 };
 
 export type GridGesture = {
-  /** Lifted: a pointer moved far enough, a finger held still, or the keyboard took it. */
   onStart?: (drag: GridDrag) => void;
-  /** Carried: on every move of the pointer, every key that moves it, and every scroll under it. */
   onMove?: (drag: GridDrag) => void;
-  /** Let go. */
   onDrop?: (drag: GridDrag) => void;
-  /** Taken back, or never lifted after all (a finger that moved before its hold). */
   onCancel?: (drag: GridDrag) => void;
-  /** Let go before it lifted: the press was a click. */
   onClick?: (drag: GridDrag) => void;
-  /** For the keyboard: the places worth landing on, in the order Tab reaches them. */
   targets?: () => GridPoint[];
-  /** For the keyboard: what a screen reader is told as it is lifted, moved, let go and taken back. */
   announce?: (drag: GridDrag, phase: 'start' | 'move' | 'drop' | 'cancel') => string | undefined;
 };
 
-/** A press, as the page is asked about it. */
 export type GridPress = {
   input: Exclude<GridInput, 'keyboard'>;
   point: GridPoint;
   square: GridPoint;
   inside: boolean;
-  /** The element pressed. */
   target: Element | null;
   event: PointerEvent;
 };
 
 export type GridSurfaceArgs = {
-  /** What the squares are ruled on: points are measured from its top left corner, its scroll included. */
   element: HTMLElement;
-  /** One square, in the surface's own pixels. */
   unit: () => number;
-  /** What a press on the surface carries; nothing leaves the press to the page. */
   press?: (press: GridPress) => GridGesture | null | undefined | void;
 };
 
 export type GridSourceArgs = {
-  /** Pressed to start a gesture: a tool in a bar, say. */
   element: HTMLElement;
-  /** The surface, registered with `surface`, that the gesture is measured on. */
   surface: HTMLElement;
   press: (press: GridPress) => GridGesture | null | undefined | void;
 };
 
 export type GridKeyboardArgs = {
   surface: HTMLElement;
-  /** Where the keyboard starts: the middle of the square of what it carries, as a rule. */
   from: GridPoint;
   gesture: GridGesture;
 };
 
 export type GridOptions = {
-  /** How far a mouse or pen moves before it lifts, in pixels. */
   dragDistance?: number;
-  /** How long a finger holds still before it lifts, in milliseconds. */
   touchHold?: number;
-  /** How near an edge, in pixels, the pointer scrolls the surface or the page. */
   autoScrollEdge?: number;
-  /** How many squares Shift and an arrow move. */
   step?: number;
-  /** The pointer's place in the viewport, for a page that rewrites the event's own; `clientX` and `clientY` by default. */
   pointerPoint?: (event: PointerEvent) => GridPoint;
 };
 
 export type GridController = {
   surface: (args: GridSurfaceArgs) => Cleanup;
   source: (args: GridSourceArgs) => Cleanup;
-  /** Carry a gesture with the keys, from a place on a registered surface. */
   keyboard: (args: GridKeyboardArgs) => void;
   isDragging: () => boolean;
-  /** Take back what is being carried, or let go of a press that has not lifted. */
   cancel: () => void;
   destroy: () => void;
 };
@@ -149,11 +94,9 @@ type Session = {
   input: GridInput;
   pointerId: number;
   origin: GridPoint;
-  /** Where the pointer last was in the viewport, or the keyboard's place in squares. */
   clientX: number;
   clientY: number;
   point: GridPoint;
-  /** Which of the keyboard's targets it last landed on. */
   landed: number;
   scrollFrame: number | null;
 };
@@ -202,7 +145,6 @@ export function createGrid(options: GridOptions = {}): GridController {
     const input: Pending['input'] = event.pointerType === 'touch' || event.pointerType === 'pen' ? event.pointerType : 'mouse';
     const client = pointOf(event);
     const at = locate(registration, client.x, client.y);
-    // Pressed inside a shadow root, the element itself rather than its host.
     const first = event.composedPath?.()[0];
     const target = first instanceof Element ? first : event.target instanceof Element ? event.target : null;
     const gesture = ask({ input, point: at.point, square: squareOf(at.point), inside: at.inside, target, event });
@@ -242,7 +184,6 @@ export function createGrid(options: GridOptions = {}): GridController {
     const client = pointOf(event);
     if (pending && event.pointerId === pending.pointerId) {
       if (Math.hypot(client.x - pending.startX, client.y - pending.startY) < settings.dragDistance) return;
-      // A finger that moves before its hold scrolls the page.
       if (pending.input === 'touch') {
         const gesture = pending.gesture, drag = pendingDrag(pending);
         clearPending();
@@ -317,7 +258,6 @@ export function createGrid(options: GridOptions = {}): GridController {
   }
 
   function onTouchMove(event: TouchEvent): void {
-    // Lifted, the finger carries what it holds rather than scrolling the page.
     if (session && event.cancelable) event.preventDefault();
   }
 
@@ -367,7 +307,6 @@ export function createGrid(options: GridOptions = {}): GridController {
     if (!session) removeWindowListeners();
   }
 
-  /** The click a drop would otherwise make on what it was let go over. */
   function suppressClick(): void {
     const stop = (event: Event) => {
       event.preventDefault();
@@ -400,7 +339,6 @@ export function createGrid(options: GridOptions = {}): GridController {
     say(args.gesture.announce?.(drag, 'start'));
   }
 
-  /** Where the session is now, told to its gesture. */
   function moveTo(current: Session, phase?: 'move'): void {
     if (current.input !== 'keyboard') current.point = locate(current.surface, current.clientX, current.clientY).point;
     const drag = dragOf(current);
@@ -466,7 +404,6 @@ export function createGrid(options: GridOptions = {}): GridController {
     current.scrollFrame = requestAnimationFrame(step);
   }
 
-  /** How fast the pointer near an edge scrolls: the surface first, where it scrolls that way, then the page. */
   function speedFor(current: Session): { element: HTMLElement | null; x: number; y: number } | null {
     const edge = settings.autoScrollEdge;
     const along = (position: number, start: number, length: number) => {
@@ -515,11 +452,9 @@ const arrows = {
   ArrowRight: { x: 1, y: 0 },
 } as const;
 
-/** A viewport point as squares on a surface, and whether it is over it. */
 function locate(surface: Surface, x: number, y: number): { point: GridPoint; inside: boolean } {
   const element = surface.element;
   const rect = element.getBoundingClientRect();
-  // A surface drawn inside a scaled parent: the screen's pixels against its own.
   const scale = element.offsetWidth > 0 && rect.width > 0 && Math.abs(rect.width / element.offsetWidth - 1) >= 0.02 ? rect.width / element.offsetWidth : 1;
   const unit = surface.unit() || 1;
   return {
@@ -535,7 +470,6 @@ function squareOf(point: GridPoint): GridPoint {
   return { x: Math.floor(point.x), y: Math.floor(point.y) };
 }
 
-/** The element at a point, looking into shadow roots. */
 function deepest(document: Document, x: number, y: number): Element | null {
   let element = document.elementFromPoint?.(x, y) ?? null;
   while (element?.shadowRoot) {
@@ -554,7 +488,6 @@ function installStyle(document: Document): void {
   document.head.appendChild(style);
 }
 
-/** Text only a screen reader reads, said as it changes. */
 function hiddenText(document: Document): HTMLElement {
   const element = document.createElement('div');
   element.setAttribute('aria-live', 'assertive');

@@ -22,7 +22,6 @@ function key(type: 'keydown' | 'keyup', name: string): void {
   window.dispatchEvent(new KeyboardEvent(type, { key: name, bubbles: true, cancelable: true }));
 }
 
-/** A row of square tiles, laid out by the order it is told: the first at the wall's corner, each a side further on. */
 function wall(names: string[], slots: (order: string[]) => string[] = (order) => order) {
   const surface = document.createElement('div');
   const tiles = names.map((name) => Object.assign(document.createElement('div'), { id: name }));
@@ -56,7 +55,6 @@ function wall(names: string[], slots: (order: string[]) => string[] = (order) =>
   };
 }
 
-/** The middle of the place a tile at this index stands in. */
 const middle = (index: number) => index * side + side / 2;
 
 describe('createTiles', () => {
@@ -195,7 +193,6 @@ describe('createTiles', () => {
   });
 
   it('holds its choice while the layout slides another tile under a still pointer', () => {
-    // A layout that re-flows: once a leads b, c is drawn where b stood.
     const page = wall(['a', 'b', 'c'], (order) => (order.join() === 'b,a,c' ? ['b', 'c', 'a'] : order));
     controller = createTiles(page);
     pointer('pointerdown', page.tile('a'), middle(0), 50);
@@ -234,7 +231,6 @@ describe('createTiles', () => {
     });
     pointer('pointerdown', page.tile('a'), middle(0), 50);
     pointer('pointermove', window, middle(0) + 10, 50);
-    // Into the first half of b: a goes before b, where it already stands in the order.
     pointer('pointermove', window, 120, 25);
     expect(asked.at(-1)).toEqual({ over: 'b', x: 0.2, y: 0.25 });
     expect(page.drawn.at(-1)).toEqual(['a', 'b', 'c']);

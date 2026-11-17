@@ -30,7 +30,6 @@ export function writeNativeData(
       dataTransfer.setData(type, value);
       wroteData = true;
     } catch {
-      // Browsers can reject unsupported media types. Keep local drag state alive.
     }
   }
 
@@ -38,14 +37,12 @@ export function writeNativeData(
     dataTransfer.setData('application/x-0001-drag', 'element');
     wroteData = true;
   } catch {
-    // Best-effort marker only.
   }
 
   if (!wroteData) {
     try {
       dataTransfer.setData('text/plain', '');
     } catch {
-      // Some test doubles and browsers can reject this too.
     }
   }
 }

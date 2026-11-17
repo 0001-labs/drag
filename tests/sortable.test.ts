@@ -8,7 +8,6 @@ const cellWidth = 79;
 
 type Layout = { list: HTMLElement; cells: HTMLElement[] };
 
-/** `buttons` is what a real mouse reports as it moves: 1 while pressed, 0 once released. */
 function pointer(type: string, target: EventTarget, x: number, y: number, pointerType = 'mouse', buttons?: number): void {
   const event = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperties(event, {
@@ -26,7 +25,6 @@ function stubBox(element: HTMLElement, left: number, top: number, width: number,
   element.getBoundingClientRect = () => ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) });
 }
 
-/** A column of cells 19px high a pixel apart, as an Ezo list draws them. */
 function column(id: string, left: number, count: number): Layout {
   const list = document.createElement('div');
   list.dataset.id = id;
@@ -124,7 +122,6 @@ describe('createSortable', () => {
   });
 
   it('lands at the prepared authored layout and hands visibility back once', async () => {
-    // The layout handoff waits for the owner window's frame; tie it to this test's clock.
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
     sortable.destroy();
     const a = column('a', 0, 3);
@@ -133,7 +130,7 @@ describe('createSortable', () => {
       prepareDrop: () => {
         final = document.createElement('div'); a.list.append(final);
         stubBox(final, 120, 140, 80, 20);
-        sortable.destroy(); // Nested editors are replaced when columns are committed.
+        sortable.destroy();
         return () => final;
       },
       onDragEnd: result => ended.push(result),
@@ -178,7 +175,6 @@ describe('createSortable', () => {
     const a = column('a', 0, 8);
     const scroller = document.createElement('div');
     scroller.style.overflowY = 'auto';
-    // A list 100px tall shows: the band is 20px, not the 60px that would reach its middle.
     stubBox(scroller, 0, 200, cellWidth, 100);
     scroller.scrollBy = (...args: unknown[]) => { scroller.scrollTop += Number(args[1] ?? 0); };
     scroller.append(a.list);
@@ -213,12 +209,10 @@ describe('createSortable', () => {
     const a = column('a', 0, 4);
     register(sortable, a, 'a');
     pointer('pointerdown', a.cells[0], 10, 10);
-    // The bottom edge (19 + moved) passes the next centre (29.5) once moved past 10.5.
     pointer('pointermove', window, 10, 20);
     expect(updates).toEqual([]);
     pointer('pointermove', window, 10, 21);
     expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 1 });
-    // The sibling closes up by the cell and its pixel, and says how far for what is inside it.
     expect(a.cells[1].style.translate).toBe('0 -20px');
     expect(a.cells[1].style.getPropertyValue('--drag-shift')).toBe('-20px');
   });
@@ -231,7 +225,6 @@ describe('createSortable', () => {
     pointer('pointermove', window, 10, 21);
     pointer('pointermove', window, 10, 20);
     expect(updates).toEqual([{ droppableId: 'a', index: 1 }]);
-    // Back once the top edge passes the moved sibling's centre (9.5).
     pointer('pointermove', window, 10, 19);
     expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 0 });
   });
@@ -271,7 +264,6 @@ describe('createSortable', () => {
     pointer('pointermove', window, 10, 52);
     expect(a.cells[1].style.translate).toBe('0 -20px');
     expect(a.cells[2].style.translate).toBe('0 -20px');
-    // Beside an item: everything goes back to where it stood at the lift.
     beside = true;
     pointer('pointermove', window, 14, 52);
     expect(a.cells[1].style.translate).toBe('none');
@@ -293,7 +285,6 @@ describe('createSortable', () => {
   });
 
   describe('a container with a hit area', () => {
-    /** A column: a header above the list and room below it, the list's box as it was. */
     function boardColumn(id: string, left: number, count: number) {
       const layout = column(id, left, count);
       const wrapper = document.createElement('section');
@@ -339,7 +330,6 @@ describe('createSortable', () => {
       pointer('pointerdown', a.cells[0], 10, 10);
       pointer('pointermove', window, 110, 500);
       expect(updates.at(-1)).toBeNull();
-      // The column grows by the room it reserves: the pointer is inside it now.
       stubBox(b.wrapper, 100, -40, cellWidth, 560);
       pointer('pointermove', window, 110, 500);
       expect(updates.at(-1)).toEqual({ droppableId: 'b', index: 0 });
@@ -372,7 +362,6 @@ describe('createSortable', () => {
     customElements.define('drag-test-avatar', DragTestAvatar);
     const a = column('a', 0, 2);
     const avatar = document.createElement('drag-test-avatar') as DragTestAvatar;
-    // Given as a property, not an attribute: a plain clone would draw the '?'.
     avatar.name = 'Mika';
     a.cells[0].append(avatar);
     await avatar.updateComplete;
@@ -471,7 +460,6 @@ describe('createSortable', () => {
     sortable = createSortable({ onDragEnd: (result) => ended.push(result), onMovement: (movement) => movements.push(movement) });
     const a = column('a', 0, 3);
     register(sortable, a, 'a');
-    // a0 holds a list of its own, drawn inside it.
     const inner = document.createElement('div');
     stubBox(inner, 0, 0, cellWidth, cellHeight);
     const child = document.createElement('div');
@@ -498,7 +486,6 @@ describe('createSortable', () => {
     });
     Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
     sortable = createSortable({
-      // The committed order draws a1 where a0 was.
       prepareDrop: () => { stubBox(a.cells[1], 0, 0, cellWidth, cellHeight); stubBox(a.cells[0], 0, pitch, cellWidth, cellHeight); return a.cells[0]; },
       onDragEnd: result => ended.push(result),
     });
@@ -526,7 +513,6 @@ describe('createSortable', () => {
     const started: HTMLElement[] = [];
     Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value(this: HTMLElement) { started.push(this); return { finish: () => {}, addEventListener: () => {} }; } });
     sortable = createSortable({
-      // The commit draws a2 20px lower than it stood.
       prepareDrop: () => { stubBox(a.cells[2], 0, 2 * pitch + 20, cellWidth, cellHeight); return a.cells[0]; },
       onDragEnd: result => ended.push(result),
     });
@@ -535,7 +521,6 @@ describe('createSortable', () => {
     pointer('pointermove', window, 10, 14);
     pointer('pointermove', window, 10, 16);
     pointer('pointerup', window, 10, 16);
-    // No frame has passed: the slide is already set, so the browser never paints a2 at its new place first.
     expect(started).toEqual([a.cells[2]]);
     await vi.runAllTimersAsync();
     expect(ended).toHaveLength(1);
@@ -546,7 +531,6 @@ describe('createSortable', () => {
   it('lands where the item rests, and slides a list\'s items with their list rather than twice', async () => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(performance.now()), 16));
     sortable.destroy();
-    // Two columns in a row: each is an item of the row and a list of its own cells.
     const row = document.createElement('div');
     stubBox(row, 0, 0, 200, 400);
     const a = column('a', 0, 2), b = column('b', 100, 1);
@@ -564,11 +548,9 @@ describe('createSortable', () => {
     });
     sortable = createSortable({
       prepareDrop: () => {
-        // The commit draws column b 50px to the left, its cell with it, and the dropped cell under that one.
         b.list.append(a.cells[0]);
         stubBox(b.list, 50, 0, cellWidth, 400);
         stubBox(b.cells[0], 50, 0, cellWidth, cellHeight);
-        // A browser applies a slide at once: while its column slides, the dropped cell is drawn 30px off its place.
         a.cells[0].getBoundingClientRect = () => {
           const left = sliding ? 80 : 50;
           return { left, top: pitch, width: cellWidth, height: cellHeight, right: left + cellWidth, bottom: pitch + cellHeight, x: left, y: pitch, toJSON: () => ({}) };
@@ -586,9 +568,7 @@ describe('createSortable', () => {
     pointer('pointermove', window, 110, 30);
     pointer('pointerup', window, 110, 30);
     await vi.advanceTimersByTimeAsync(20);
-    // The column slides its 50px; its cell goes with it and is not sent 50px more.
     expect(started).toEqual([[b.list, '50px 0px']]);
-    // The landing was measured before anything slid.
     expect((document.querySelector('[data-drag-preview]') as HTMLElement).style.transform).toContain('translate3d(50px, 20px, 0)');
     await vi.runAllTimersAsync();
     expect(ended[0]?.destination).toEqual({ droppableId: 'b', index: 1 });
@@ -608,7 +588,6 @@ describe('createSortable', () => {
     const moves: Array<{ element: HTMLElement; phase: string; x: number }> = [];
     sortable = createSortable({
       onMovement: movement => moves.push(movement),
-      // The commit draws column b, and its cell, where the slide was taking them.
       prepareDrop: () => { stubBox(b.list, 21, 0, cellWidth, 400); stubBox(b.cells[0], 21, 0, cellWidth, cellHeight); return a.list; },
       onDragEnd: result => ended.push(result),
     });
@@ -617,22 +596,18 @@ describe('createSortable', () => {
     sortable.item({ element: b.list, id: 'column-b', type: 'cell' });
     register(sortable, a, 'a');
     register(sortable, b, 'b');
-    // Column a is carried past column b, which starts sliding 79px to the left to make room.
     pointer('pointerdown', a.list, 10, 300);
     pointer('pointermove', window, 130, 300);
     expect(b.list.style.translate).toBe('-79px 0');
-    // Dropped half way through that slide: the column and the cell in it are drawn 40px along.
     const computed = window.getComputedStyle.bind(window);
     const style = vi.spyOn(window, 'getComputedStyle').mockImplementation((element: Element, pseudo?: string | null) =>
       element === b.list ? Object.assign(Object.create(computed(element)) as CSSStyleDeclaration, { translate: '-40px 0px' }) : computed(element, pseudo));
     stubBox(b.list, 60, 0, cellWidth, 400);
     stubBox(b.cells[0], 60, 0, cellWidth, cellHeight);
     pointer('pointerup', window, 130, 300);
-    // The commit ends the slide: from here the column is drawn where it is set to stand.
     style.mockRestore();
     await vi.runAllTimersAsync();
     expect(ended).toHaveLength(1);
-    // Both end where they were heading: nothing moved a second time.
     expect(moves.filter(({ phase }) => phase === 'drop')).toEqual([]);
     // @ts-expect-error The test's own animate is removed again.
     delete HTMLElement.prototype.animate;
@@ -646,7 +621,6 @@ describe('createSortable', () => {
     sortable = createSortable({
       onMovement: movement => moves.push(movement),
       prepareDrop: () => a.cells[0],
-      // The page draws once more as the drag ends, and puts a sibling 30px lower than it committed it.
       onDragEnd: () => stubBox(a.cells[2], 0, 2 * pitch + 30, cellWidth, cellHeight),
     });
     register(sortable, a, 'a');
@@ -764,22 +738,17 @@ describe('createSortable', () => {
     it('lifts once the press carries it where its words cannot be chosen, even after choosing some', () => {
       const a = column('a', 0, 3);
       sortable.container({ element: a.list, id: 'a', type: 'cell' });
-      // As a block in a column: past x 100 stands the next column.
       a.cells.forEach((cell, index) => sortable.item({ element: cell, id: `a${index}`, type: 'cell', text: { hold: () => 400, axis: 'y', carries: point => point.x > 100 } }));
       pointer('pointerdown', a.cells[0], 10, 10);
-      // Along the line: words are being chosen.
       pointer('pointermove', window, 40, 11);
       pointer('pointermove', window, 70, 11);
       expect(sortable.isDragging()).toBe(false);
-      // The hold no longer lifts it while words are chosen.
       vi.advanceTimersByTime(500);
       expect(sortable.isDragging()).toBe(false);
-      // Into the next column: it is carried.
       pointer('pointermove', window, 130, 11);
       expect(sortable.isDragging()).toBe(true);
       pointer('pointerup', window, 130, 11);
       vi.runAllTimers();
-      // Without the rule, the same press only chooses words.
       sortable.destroy();
       sortable = createSortable();
       a.cells.forEach((cell, index) => sortable.item({ element: cell, id: `b${index}`, type: 'cell', text: { hold: () => 400, axis: 'y' } }));
@@ -885,7 +854,6 @@ describe('createSortable', () => {
       expect(b.cells[0].style.translate).toBe('');
       expect(b.list.style.getPropertyValue('--drag-reserve')).toBe('');
       pointer('pointerup', window, 110, 10);
-      // No timers run: the drop is there at once.
       expect(ended).toEqual([expect.objectContaining({ destination: { droppableId: 'b', index: 0 }, reason: 'DROP' })]);
       expect(preview()).toBeNull();
     });
@@ -896,7 +864,6 @@ describe('createSortable', () => {
       a.cells[1].dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
       const down = () => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
       down();
-      // Over a2, a square below where a1 was lifted.
       expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 2 });
       expect(preview()?.style.transform).toBe('translate3d(0px, 20px, 0)');
       down();
@@ -940,12 +907,10 @@ describe('createSortable', () => {
       const a = column('a', 0, 4);
       combinable(a, 'a');
       pointer('pointerdown', a.cells[0], 10, 10);
-      // The bottom edge at 27: inside 24.75 to 34.25, the middle half of a1 where it stands.
       pointer('pointermove', window, 10, 18);
       expect(combines.at(-1)).toEqual({ draggableId: 'a1', droppableId: 'a' });
       expect(updates.at(-1)).toBeNull();
       expect(a.cells[1].hasAttribute('data-drag-combine')).toBe(true);
-      // Past it, the item goes back to moving between the others.
       pointer('pointermove', window, 10, 26);
       expect(combines.at(-1)).toBeNull();
       expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 1 });
@@ -980,7 +945,6 @@ describe('createSortable', () => {
     const a = column('a', 0, 4);
     sortable = createSortable({
       onDragUpdate: (update) => updates.push(update.destination),
-      // A selection folded into the row that carries it: a2 leaves the list before the lift.
       onBeforeCapture: ({ draggableId, mode }) => {
         calls.push(`${draggableId}:${mode}`);
         a.cells[2].remove();
@@ -991,7 +955,6 @@ describe('createSortable', () => {
     pointer('pointerdown', a.cells[0], 10, 10);
     pointer('pointermove', window, 10, 100);
     expect(calls).toEqual(['a0:FLUID', 'start']);
-    // Only a1 and a3 are left to pass: the end of the list is index 2.
     expect(updates.at(-1)).toEqual({ droppableId: 'a', index: 2 });
   });
 
@@ -1019,14 +982,12 @@ describe('createSortable', () => {
       expect(seen).toEqual([false, true]);
       expect(preview.hasAttribute('data-selected')).toBe(false);
       expect(preview.querySelector('i')?.textContent).toBe('3');
-      // The item itself is the page's: nothing is taken from it or added to it.
       expect(a.cells[0].hasAttribute('data-selected')).toBe(true);
       expect(a.cells[0].querySelector('i')).toBeNull();
     });
 
     it('copies the tree of a component the page has no definition for, as it stands', () => {
       const a = column('a', 0, 2);
-      // Made in another window and adopted here: this page never draws it again.
       const foreign = document.createElement('drag-foreign-part');
       foreign.attachShadow({ mode: 'open' }).innerHTML = '<style>b{color:rgb(1, 2, 3)}</style><b>Drawn elsewhere</b><slot></slot>';
       const inner = document.createElement('drag-foreign-inner');
@@ -1038,7 +999,6 @@ describe('createSortable', () => {
       expect(copy.shadowRoot?.querySelector('b')?.textContent).toBe('Drawn elsewhere');
       expect(copy.shadowRoot?.querySelector('style')?.textContent).toContain('rgb(1, 2, 3)');
       expect(copy.shadowRoot?.querySelector('drag-foreign-inner')?.shadowRoot?.textContent).toBe('Inside');
-      // The page's own tree is untouched.
       expect(foreign.shadowRoot?.querySelector('b')?.textContent).toBe('Drawn elsewhere');
     });
 
@@ -1079,7 +1039,6 @@ describe('createSortable', () => {
       expect(lift(a.cells[0]).style.backgroundColor).toBe('rgb(250, 249, 248)');
       pointer('pointerup', window, 10, 35);
       vi.runAllTimers();
-      // One that paints its own keeps it.
       a.cells[1].style.backgroundColor = 'rgb(200, 0, 0)';
       pointer('pointerdown', a.cells[1], 10, 30);
       pointer('pointermove', window, 10, 55);
@@ -1105,7 +1064,6 @@ describe('createSortable', () => {
   });
 
   describe('edge scrolling', () => {
-    /** A scroller 200px tall from 200 down: its bands are the top and bottom 40px. */
     function scrolling(period = 16) {
       let now = 0;
       const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => window.setTimeout(() => callback(now += period), period));
@@ -1124,17 +1082,14 @@ describe('createSortable', () => {
 
     it('leaves an edge the item was lifted beside alone until the pointer goes on towards it', async () => {
       const { a, scroller, frame } = scrolling();
-      // Pressed 30px from the foot, inside the band, and carried up: nobody asked to scroll.
       pointer('pointerdown', a.cells[8], 10, 370);
       pointer('pointermove', window, 10, 364);
       expect(sortable.isDragging()).toBe(true);
       await vi.advanceTimersByTimeAsync(64);
       expect(scroller.scrollTop).toBe(0);
-      // Back past where it was pressed, but not far enough to mean it.
       pointer('pointermove', window, 10, 376);
       await vi.advanceTimersByTimeAsync(64);
       expect(scroller.scrollTop).toBe(0);
-      // On towards the edge: now it scrolls.
       pointer('pointermove', window, 10, 382);
       await vi.advanceTimersByTimeAsync(64);
       expect(scroller.scrollTop).toBeGreaterThan(0);
@@ -1177,7 +1132,6 @@ describe('createSortable', () => {
     it('still scrolls where a frame is owed less than a pixel', async () => {
       const { a, scroller, frame } = scrolling();
       pointer('pointerdown', a.cells[2], 10, 250);
-      // Just inside the band: a fraction of a pixel a frame.
       pointer('pointermove', window, 10, 366);
       await vi.advanceTimersByTimeAsync(160);
       expect(scroller.scrollTop).toBeGreaterThan(0);
@@ -1212,7 +1166,6 @@ describe('createSortable', () => {
         expect(document.documentElement.hasAttribute('data-drag-active')).toBe(false);
         expect(a.cells[0].style.visibility).toBe('');
         expect(a.cells[1].style.translate).toBe('');
-        // The next press is the page's again.
         pointer('pointerdown', a.cells[1], 10, 30);
         pointer('pointermove', window, 10, 60);
         expect(sortable.isDragging()).toBe(true);
@@ -1226,12 +1179,10 @@ describe('createSortable', () => {
     it('ends a press and a carry whose release it never saw', () => {
       const a = column('a', 0, 3);
       register(sortable, a, 'a');
-      // Pressed, then the mouse comes back with no button down: it was let go elsewhere.
       pointer('pointerdown', a.cells[0], 10, 10, 'mouse', 1);
       pointer('pointermove', window, 10, 30, 'mouse', 0);
       pointer('pointermove', window, 10, 60, 'mouse', 0);
       expect(sortable.isDragging()).toBe(false);
-      // Carried, then the same: it goes home rather than follow a pointer nobody is holding.
       pointer('pointerdown', a.cells[0], 10, 10, 'mouse', 1);
       pointer('pointermove', window, 10, 40, 'mouse', 1);
       expect(sortable.isDragging()).toBe(true);
@@ -1248,7 +1199,6 @@ describe('createSortable', () => {
       pointer('pointerdown', a.cells[0], 10, 10);
       pointer('pointermove', window, 10, 40);
       pointer('pointerup', window, 10, 40);
-      // Still on its way to its slot.
       expect(ended).toHaveLength(0);
       pointer('pointerdown', a.cells[2], 10, 50);
       expect(ended).toEqual([expect.objectContaining({ draggableId: 'a0', reason: 'DROP' })]);
@@ -1285,7 +1235,6 @@ describe('createSortable', () => {
       register(sortable, a, 'a');
       const clicked = vi.fn();
       const click = () => a.cells[1].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-      // Nothing an earlier test left waiting for a click is counted here.
       vi.runAllTimers();
       click();
       document.body.addEventListener('click', clicked);
@@ -1294,7 +1243,6 @@ describe('createSortable', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       vi.runAllTimers();
       expect(ended).toHaveLength(1);
-      // The button is still down; letting go is the end of the cancelled drag, not a press on the page.
       pointer('pointerup', window, 10, 40);
       click();
       expect(clicked).not.toHaveBeenCalled();
